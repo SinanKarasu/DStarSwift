@@ -22,6 +22,8 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
     private var lastFrameTime: CFAbsoluteTime = 0
     private let gameState = DStarGameState()
     private var drawTrimLines = true
+    private weak var attachedView: MTKView?
+    private var feedbackFramesRemaining = 0
 
     private var depthStateFill: MTLDepthStencilState?
     private var depthStateLines: MTLDepthStencilState?
@@ -39,6 +41,7 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
 	
     func configure(for view: MTKView) {
         guard let device = view.device else { return }
+        self.attachedView = view
         self.device = device
         self.queue = device.makeCommandQueue()
         self.stars = makeStarBuffer(device: device)
@@ -48,6 +51,7 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         self.depthStateLines = makeDepthState(device: device, write: false, compare: .lessEqual)
 
         self.ringworldRoot = BSPUtil.makeRingworldTree()
+        updateTrimFeedbackUI()
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
@@ -59,6 +63,9 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
     func handleInput(_ action: DStarInputAction) {
         if case let .keyCharacter(raw) = action, raw == "l" || raw == "L" {
             drawTrimLines.toggle()
+            feedbackFramesRemaining = 8
+            print("Trim lines \(drawTrimLines ? "ON" : "OFF")")
+            updateTrimFeedbackUI()
         }
         gameState.apply(action)
     }
@@ -79,6 +86,15 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         passDescriptor.depthAttachment.loadAction = .clear
         passDescriptor.depthAttachment.storeAction = .dontCare
         passDescriptor.depthAttachment.clearDepth = 1.0
+        if feedbackFramesRemaining > 0 {
+            let c = drawTrimLines
+                ? MTLClearColor(red: 0.0, green: 0.12, blue: 0.0, alpha: 1.0)
+                : MTLClearColor(red: 0.12, green: 0.0, blue: 0.0, alpha: 1.0)
+            passDescriptor.colorAttachments[0].clearColor = c
+            feedbackFramesRemaining -= 1
+        } else {
+            passDescriptor.colorAttachments[0].clearColor = view.clearColor
+        }
 
         let commandBuffer = queue.makeCommandBuffer()
         let encoder = commandBuffer?.makeRenderCommandEncoder(descriptor: passDescriptor)
@@ -91,7 +107,7 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         let projection = simd_float4x4.perspective(
             fovY: 65.0 * .pi / 180.0,
             aspect: max(aspect, 0.0001),
-            nearZ: 1.0,
+            nearZ: 20.0,
             farZ: 10_000.0
         )
         let ship = gameState.me
@@ -178,6 +194,7 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         descriptor.fragmentFunction = library.makeFunction(name: fragment)
         descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
         descriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
+        descriptor.sampleCount = view.sampleCount
         return try? device.makeRenderPipelineState(descriptor: descriptor)
     }
 
@@ -210,5 +227,13 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         }
 
         return (triangles, lines)
+    }
+
+    private func updateTrimFeedbackUI() {
+#if os(macOS)
+        if let titleWindow = attachedView?.window {
+            titleWindow.title = "DStarSwift  |  Trim: \(drawTrimLines ? "ON" : "OFF")  |  Toggle: L"
+        }
+#endif
     }
 }

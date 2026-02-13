@@ -117,6 +117,7 @@ struct DStarMetalView: NSViewRepresentable {
         view.clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.2, alpha: 1.0)
         view.colorPixelFormat = .bgra8Unorm
         view.depthStencilPixelFormat = .depth32Float
+        view.sampleCount = 4
         view.delegate = context.coordinator
         view.onInput = { action in
             context.coordinator.handleInput(action)
@@ -141,6 +142,7 @@ struct DStarMetalView: UIViewRepresentable {
         view.clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.2, alpha: 1.0)
         view.colorPixelFormat = .bgra8Unorm
         view.depthStencilPixelFormat = .depth32Float
+        view.sampleCount = 4
         view.delegate = context.coordinator
         context.coordinator.configure(for: view)
         return view
