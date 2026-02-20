@@ -7,18 +7,28 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		453D8C9A19378ACABD2B7DC6 /* DStarSwiftVision.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DStarSwiftVision.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F785B2AC2F3E4EFA00C94267 /* DStarSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DStarSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F785B2AE2F3E4EFA00C94267 /* DStarSwift */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = DStarSwift;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		66DDDC21892FD12A6C3A7FFA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F785B2A92F3E4EFA00C94267 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -41,6 +51,7 @@
 			isa = PBXGroup;
 			children = (
 				F785B2AC2F3E4EFA00C94267 /* DStarSwift.app */,
+				453D8C9A19378ACABD2B7DC6 /* DStarSwiftVision.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +59,26 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		98D402F4CCDAF8099781DDC1 /* DStarSwiftVision */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 20CCD1A74A9193E106C1DF24 /* Build configuration list for PBXNativeTarget "DStarSwiftVision" */;
+			buildPhases = (
+				ACD6C2A26E333C3A9106AE71 /* Sources */,
+				66DDDC21892FD12A6C3A7FFA /* Frameworks */,
+				8B334A3B8742A014F36E627F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				F785B2AE2F3E4EFA00C94267 /* DStarSwift */,
+			);
+			name = DStarSwiftVision;
+			productName = DStarSwiftVision;
+			productReference = 453D8C9A19378ACABD2B7DC6 /* DStarSwiftVision.app */;
+			productType = "com.apple.product-type.application";
+		};
 		F785B2AB2F3E4EFA00C94267 /* DStarSwift */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F785B2B72F3E4EFB00C94267 /* Build configuration list for PBXNativeTarget "DStarSwift" */;
@@ -64,8 +95,6 @@
 				F785B2AE2F3E4EFA00C94267 /* DStarSwift */,
 			);
 			name = DStarSwift;
-			packageProductDependencies = (
-			);
 			productName = DStarSwift;
 			productReference = F785B2AC2F3E4EFA00C94267 /* DStarSwift.app */;
 			productType = "com.apple.product-type.application";
@@ -80,6 +109,9 @@
 				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
+					98D402F4CCDAF8099781DDC1 = {
+						CreatedOnToolsVersion = 26.3;
+					};
 					F785B2AB2F3E4EFA00C94267 = {
 						CreatedOnToolsVersion = 26.3;
 					};
@@ -100,11 +132,19 @@
 			projectRoot = "";
 			targets = (
 				F785B2AB2F3E4EFA00C94267 /* DStarSwift */,
+				98D402F4CCDAF8099781DDC1 /* DStarSwiftVision */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		8B334A3B8742A014F36E627F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F785B2AA2F3E4EFA00C94267 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +155,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		ACD6C2A26E333C3A9106AE71 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F785B2A82F3E4EFA00C94267 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -125,6 +172,64 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		120826D532F5DF23A7E651F4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4HVP45GV3U;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.bozuk.DStarSwiftVision;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		A6D5EB561061C110807D2CDC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4HVP45GV3U;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.bozuk.DStarSwiftVision;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
 		F785B2B52F3E4EFB00C94267 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -332,6 +437,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		20CCD1A74A9193E106C1DF24 /* Build configuration list for PBXNativeTarget "DStarSwiftVision" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				120826D532F5DF23A7E651F4 /* Release */,
+				A6D5EB561061C110807D2CDC /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F785B2A72F3E4EFA00C94267 /* Build configuration list for PBXProject "DStarSwift" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
