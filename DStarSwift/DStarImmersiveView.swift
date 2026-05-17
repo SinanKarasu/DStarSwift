@@ -66,17 +66,27 @@ struct DStarImmersiveView: View {
 
     private func makeStarfieldEntity(scale: Float) -> Entity {
         let root = Entity()
+        // VisionOS pays a steeper per-entity cost, so dial the count down.
+        let source = SphericalShellStarfield(starCount: 1200)
         let starMesh = MeshResource.generateSphere(radius: 0.004)
-        let starMaterial = UnlitMaterial(color: .white)
 
-        for (i, p) in LegacyStarfield.points.enumerated() {
-            if i % 2 != 0 { continue }
-            let star = ModelEntity(mesh: starMesh, materials: [starMaterial])
-            star.position = p * scale
-            root.addChild(star)
+        for star in source.makeStars() {
+            let material = UnlitMaterial(color: visionStarColor(for: star.colorIndex))
+            let entity = ModelEntity(mesh: starMesh, materials: [material])
+            entity.position = star.position * scale
+            root.addChild(entity)
         }
 
         return root
+    }
+
+    private func visionStarColor(for index: UInt8) -> UIColor {
+        switch index {
+        case 1: return UIColor(red: 1.0, green: 0.5, blue: 0.5, alpha: 1)
+        case 2: return UIColor(red: 0.7, green: 1.0, blue: 0.8, alpha: 1)
+        case 3: return UIColor(red: 0.6, green: 0.7, blue: 1.0, alpha: 1)
+        default: return .white
+        }
     }
 
     private func collectNodes(_ node: BSPNode?, into out: inout [BSPNode]) {

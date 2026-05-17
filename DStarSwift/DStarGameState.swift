@@ -174,10 +174,20 @@ final class DStarGameState {
         case let .keyCharacter(raw):
             handleCharacterKey(raw)
         case .tab:
-            break
+            cycleRadarTarget()
         case .escape:
             freezeFrame.toggle()
         }
+    }
+
+    /// Stub — the legacy game cycled through nearby radar contacts here.
+    /// We don't have a fleet of objects yet in the Swift port, so this just
+    /// nudges the targetID and logs. It will become real once the object
+    /// world is populated.
+    private func cycleRadarTarget() {
+        guard (me.flags & DStarObjectFlags.radar) != 0 else { return }
+        let next = (me.targetID ?? 0) + 1
+        me.targetID = next % max(DStarGameParameters.maxObjects, 1)
     }
 
     func step(deltaTime: Float) {
@@ -190,6 +200,9 @@ final class DStarGameState {
 
     private func handleFunctionKey(_ key: Int) {
         switch key {
+        case 1:
+            // F1 → toggle on-screen help, matching modern game convention.
+            showHelp.toggle()
         case 2:
             armedMissiles += 1
         case 3:
@@ -197,6 +210,10 @@ final class DStarGameState {
                 armedMissiles -= 1
                 missilesRemaining -= 1
             }
+        case 4:
+            // F4 → autopilot toggle, mirroring 'a'.
+            autoPilot.toggle()
+            if !autoPilot { autoFire = false }
         default:
             break
         }
@@ -210,7 +227,13 @@ final class DStarGameState {
             me.speed = DStarGameParameters.defaultSpeed * 0.5
         case "2":
             me.speed = DStarGameParameters.defaultSpeed
-        case "h":
+        case "+", "=":
+            // Nudge speed up — handy on a laptop without a numeric row.
+            me.speed = min(me.speed + DStarGameParameters.defaultSpeed * 0.25,
+                           DStarGameParameters.defaultSpeed * 4)
+        case "-", "_":
+            me.speed = max(me.speed - DStarGameParameters.defaultSpeed * 0.25, 0)
+        case "h", "?", "/":
             showHelp.toggle()
         case "A":
             autoFire = !autoPilot
@@ -236,6 +259,10 @@ final class DStarGameState {
             }
         case "f":
             freezeFrame.toggle()
+        case "p":
+            // Debug — matches original 'p' that printed location.
+            print(String(format: "pos = (%8.1f, %8.1f, %8.1f)",
+                         me.position.x, me.position.y, me.position.z))
         default:
             break
         }

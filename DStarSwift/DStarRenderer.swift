@@ -20,10 +20,29 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
     private var ringworldRoot: BSPNode?
     private var aspect: Float = 1.0
     private var lastFrameTime: CFAbsoluteTime = 0
-    private let gameState = DStarGameState()
+    let gameState = DStarGameState()
     private var drawTrimLines = true
     private weak var attachedView: MTKView?
     private var feedbackFramesRemaining = 0
+
+    /// Optional SwiftUI mirror. The renderer pushes flag changes here each
+    /// frame so the help overlay / HUD can react to in-game key presses,
+    /// and wires the HUD's `onCommand` callback so menu items can send
+    /// input back into the game state.
+    weak var hud: DStarHUDState? {
+        didSet {
+            guard let hud else { return }
+            DispatchQueue.main.async { [weak self] in
+                hud.onCommand = { [weak self] action in
+                    self?.handleInput(action)
+                }
+            }
+        }
+    }
+
+    /// The data source for background stars. Swap this for a `DESIStarfieldSource`
+    /// later without touching the renderer.
+    var starfieldSource: StarfieldSource = SphericalShellStarfield()
 
     private var depthStateFill: MTLDepthStencilState?
     private var depthStateLines: MTLDepthStencilState?
@@ -104,6 +123,13 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         lastFrameTime = now
         gameState.step(deltaTime: delta)
 
+        if let hud {
+            let game = gameState
+            DispatchQueue.main.async {
+                hud.update(from: game)
+            }
+        }
+
         let projection = simd_float4x4.perspective(
             fovY: 65.0 * .pi / 180.0,
             aspect: max(aspect, 0.0001),
@@ -160,29 +186,25 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
     }
 
     private func makeStarBuffer(device: MTLDevice) -> MTLBuffer? {
+        let palette: [SIMD4<Float>] = [
+            SIMD4<Float>(1, 1, 1, 1),   // white
+            SIMD4<Float>(1, 0.4, 0.4, 1), // red giants
+            SIMD4<Float>(0.6, 1, 0.7, 1), // green-tinted
+            SIMD4<Float>(0.6, 0.7, 1, 1), // blue
+        ]
+
+        let points = starfieldSource.makeStars()
         var vertices: [StarVertex] = []
-        vertices.reserveCapacity(LegacyStarfield.points.count)
-
-        let starTotal = LegacyStarfield.points.count
-        let other = starTotal / 8
-        let whiteCount = starTotal - other * 3
-
-        for i in 0..<starTotal {
-            let color: SIMD4<Float>
-            if i < whiteCount {
-                color = SIMD4<Float>(1, 1, 1, 1)
-            } else if i < whiteCount + other {
-                color = SIMD4<Float>(1, 0, 0, 1)
-            } else if i < whiteCount + other * 2 {
-                color = SIMD4<Float>(0, 1, 0, 1)
-            } else {
-                color = SIMD4<Float>(0, 0, 1, 1)
-            }
-
-            vertices.append(StarVertex(position: LegacyStarfield.points[i], color: color))
+        vertices.reserveCapacity(points.count)
+        for star in points {
+            let idx = Int(min(star.colorIndex, 3))
+            var color = palette[idx]
+            color.w = star.magnitude
+            vertices.append(StarVertex(position: star.position, color: color))
         }
 
         starCount = vertices.count
+        guard !vertices.isEmpty else { return nil }
         let length = MemoryLayout<StarVertex>.stride * vertices.count
         return device.makeBuffer(bytes: vertices, length: length)
     }
