@@ -10,19 +10,31 @@ import SwiftUI
 @main
 struct DStarSwiftApp: App {
     @StateObject private var hud = DStarHUDState()
+    @StateObject private var net = NetSession()
 
 #if os(visionOS)
     @State private var immersionStyle: ImmersionStyle = .mixed
 #endif
 
+    init() {
+        // Wire HUD → NetSession once the renderer has a game state.
+        // We can't do this in @StateObject initializer (instance not yet
+        // bound), so we register inside `body` via a one-shot side effect.
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(hud)
+                .environmentObject(net)
+                .onAppear {
+                    hud.onGameStateReady = { [weak net] game in
+                        net?.attach(game: game)
+                    }
+                }
         }
 #if os(macOS)
         .commands {
-            // No documents to create — drop the default "New" item.
             CommandGroup(replacing: .newItem) { }
 
             CommandMenu("Game") {
@@ -56,6 +68,24 @@ struct DStarSwiftApp: App {
                     .keyboardShortcut("m", modifiers: [.command])
                 Button("Launch Missile") { hud.commandLaunchMissile() }
                     .keyboardShortcut("m", modifiers: [.command, .shift])
+            }
+
+            CommandMenu("Multiplayer") {
+                Button(net.isRunning ? "Stop Hosting" : "Start Hosting (Bonjour)") {
+                    if net.isRunning { net.stop() } else { net.start() }
+                }
+                .keyboardShortcut("h", modifiers: [.command, .shift])
+
+                Divider()
+
+                Text("Local name: \(net.localName)")
+                Text(net.peers.isEmpty ? "No peers"
+                                       : "Peers: \(net.peers.joined(separator: ", "))")
+
+                Divider()
+
+                Button("Spawn Robot") { hud.commandSpawnRobot() }
+                    .keyboardShortcut("b", modifiers: [.command])
             }
 
             CommandGroup(replacing: .help) {

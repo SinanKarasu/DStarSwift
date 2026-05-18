@@ -32,10 +32,15 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
     weak var hud: DStarHUDState? {
         didSet {
             guard let hud else { return }
+            let game = gameState
             DispatchQueue.main.async { [weak self] in
                 hud.onCommand = { [weak self] action in
                     self?.handleInput(action)
                 }
+                hud.onSpawnRobot = { [weak game] in
+                    game?.spawnRobot()
+                }
+                hud.onGameStateReady?(game)
             }
         }
     }
@@ -149,7 +154,13 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         if let device {
             var visible: [BSPNode] = []
             BSPUtil.collectVisiblePolygons(node: ringworldRoot, viewer: ship.position, out: &visible)
-            let (triangleVertices, lineVertices) = makeMeshVertices(from: visible)
+            var (triangleVertices, lineVertices) = makeMeshVertices(from: visible)
+
+            // Append every other ship's mesh into the same triangle buffer.
+            // Player ship (`me`) is not drawn — the camera IS its cockpit.
+            for other in gameState.others.values {
+                appendFighterTriangles(for: other, into: &triangleVertices)
+            }
 
             if !triangleVertices.isEmpty {
                 let triBuffer = device.makeBuffer(
@@ -249,6 +260,49 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         }
 
         return (triangles, lines)
+    }
+
+    /// Each ship's mesh is in local space (forward = +Z, up = +Y, right = +X).
+    /// Transform by the ship's basis and position to put it in world space.
+    /// The mesh is small (26 polys), so we just expand triangles inline.
+    private func appendFighterTriangles(
+        for ship: DStarObject,
+        into triangles: inout [StarVertex]
+    ) {
+        let scale: Float = 8.0   // bare fighter is ~3 units long; bump for visibility
+        let r = ship.right * scale
+        let u = ship.up * scale
+        let f = ship.forward * scale
+        let p = ship.position
+
+        @inline(__always)
+        func toWorld(_ v: SIMD3<Float>) -> SIMD3<Float> {
+            SIMD3<Float>(
+                v.x * r.x + v.y * u.x + v.z * f.x,
+                v.x * r.y + v.y * u.y + v.z * f.y,
+                v.x * r.z + v.y * u.z + v.z * f.z
+            ) + p
+        }
+
+        for poly in FighterMesh.fighter1 {
+            guard poly.vertices.count >= 3 else { continue }
+            let c = BSPUtil.color(poly.color)
+            let v0 = toWorld(poly.vertices[0])
+            for i in 1..<(poly.vertices.count - 1) {
+                let vi = toWorld(poly.vertices[i])
+                let vj = toWorld(poly.vertices[i + 1])
+                triangles.append(StarVertex(position: v0, color: c))
+                triangles.append(StarVertex(position: vi, color: c))
+                triangles.append(StarVertex(position: vj, color: c))
+                if poly.doubleSided {
+                    // Emit the back face too so the mesh is visible from any angle
+                    // (the depth pipeline does the rest).
+                    triangles.append(StarVertex(position: v0, color: c))
+                    triangles.append(StarVertex(position: vj, color: c))
+                    triangles.append(StarVertex(position: vi, color: c))
+                }
+            }
+        }
     }
 
     private func updateTrimFeedbackUI() {

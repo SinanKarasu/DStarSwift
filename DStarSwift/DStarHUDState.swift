@@ -23,6 +23,13 @@ final class DStarHUDState: ObservableObject {
     /// back into the game state.
     var onCommand: ((DStarInputAction) -> Void)?
 
+    /// Set by the app; the renderer calls this once the `DStarGameState` is
+    /// alive so `NetSession` can hold a reference to it.
+    var onGameStateReady: ((DStarGameState) -> Void)?
+
+    /// Set by the app; HUD UI calls this to spawn a robot.
+    var onSpawnRobot: (() -> Void)?
+
     func update(from game: DStarGameState) {
         if showHelp != game.showHelp { showHelp = game.showHelp }
         if freezeFrame != game.freezeFrame { freezeFrame = game.freezeFrame }
@@ -42,6 +49,7 @@ final class DStarHUDState: ObservableObject {
 
     // MARK: - Commands the UI can issue
 
+    func commandSpawnRobot() { onSpawnRobot?() }
     func commandToggleHelp() { onCommand?(.keyCharacter("h")) }
     func commandToggleFreeze() { onCommand?(.keyCharacter("f")) }
     func commandToggleAutopilot() { onCommand?(.keyCharacter("a")) }

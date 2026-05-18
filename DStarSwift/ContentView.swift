@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var hud: DStarHUDState
+    @EnvironmentObject private var net: NetSession
 
 #if os(visionOS)
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
@@ -62,6 +63,10 @@ struct ContentView: View {
             if hud.radarOn { badge("radar", color: .green) }
             if hud.mouseControl { badge("mouse", color: .orange) }
             badge("missiles \(hud.armedMissiles)/\(hud.missilesRemaining)", color: .white)
+            if net.isRunning {
+                badge("net • \(net.peers.count) peer\(net.peers.count == 1 ? "" : "s")",
+                      color: net.peers.isEmpty ? .yellow : .green)
+            }
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
     }
@@ -96,11 +101,14 @@ struct ContentView: View {
                 bindingRow("h / F1 / ?", "toggle this help")
                 bindingRow("l", "toggle ringworld trim lines")
                 bindingRow("p", "print location (debug)")
+                bindingRow("b", "spawn local AI robot")
             }
             Divider().padding(.vertical, 4)
             Group {
                 bindingRow("⌘Q", "quit")
                 bindingRow("⌘?", "toggle help")
+                bindingRow("⌘⇧H", "start / stop multiplayer (Bonjour)")
+                bindingRow("⌘B", "spawn AI robot")
                 bindingRow("⌘,", "preferences (coming soon)")
             }
         }
@@ -153,4 +161,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentObject(DStarHUDState())
+        .environmentObject(NetSession())
 }

@@ -124,3 +124,88 @@ Open items captured from the user request:
   - `h` and `⌘?` both show the help panel,
   - `f`, `Esc`, and `⌘.` all toggle freeze,
   - HUD speed label updates with `0/1/2/+/-`.
+
+## Multi-ship + robots + Bonjour networking
+
+Landed on `claude/11newfeatures` after the macOS pass:
+
+### Roster
+
+- `DStarObject` is still a value type; `DStarGameState` now owns
+  `me` (the local player at id `0`) and `others: [Int: DStarObject]`
+  (every robot / network peer keyed by id).
+- Each ship has a `ShipController` (in `controllers: [Int: any ShipController]`).
+  Controller protocol is in `ShipController.swift` — three implementations:
+  - `PlayerController` — input-driven; the legacy `controlShip()` body.
+  - `AutopilotController` — vector-feedback port of `autopilot.c:auto_control`.
+    Resolves `ship.targetID` from `world.others`; with `huntsForTargets=true`
+    it picks the nearest other ship when no target is set.
+  - `RemoteController` — applies the most recent network snapshot.
+- `ShipKinematics.advance(...)` holds the `forward/up/right` integration
+  from `adjust_vectors()`, shared by player + autopilot.
+- `DStarGameState.step(_:)` drives every ship in the roster through its
+  controller each frame, with `ShipWorld` giving controllers a read-only
+  view of everyone else.
+
+### Robots
+
+- `b` key (and `⌘B` from the menu) spawns a local AI opponent:
+  `DStarGameState.spawnRobot()` creates a `DStarObject` with
+  `objectClass = .robot`, `flags |= robot`, and an `AutopilotController`
+  with `huntsForTargets = true`. Robots get ids `1000+` so they don't
+  collide with network-allocated peer ids (`1...maxPlayers`).
+- The renderer iterates `gameState.others.values` and stamps the ported
+  `FighterMesh.fighter1` at each ship's basis/position. `me` is not drawn
+  (the camera *is* its cockpit).
+
+### Fighter mesh
+
+- `FighterMesh.swift` is auto-generated from `dstar-1.0/fighter1_bsp.h`
+  by `tools/parse_fighter.py`. 26 polygons, with the `BSP_BACK_VIEW`
+  flag preserved as `doubleSided`. Regenerate by re-running the script.
+
+### Networking
+
+- Wire vocabulary mirrors the legacy `netio.h` cases but uses Swift
+  `Codable` (JSON v1, easy to inspect with tcpdump; flip to binary
+  Codable later without touching call sites). See `NetMessage.swift`.
+- `ShipState` (`NetMessage.swift`) is the on-wire snapshot for
+  `NET_CURRENT_STATUS`; it lossy-round-trips a `DStarObject`.
+- `NetTransport` (`NetTransport.swift`) is the swap point for GameKit
+  later. The only implementation right now is
+  `BonjourUDPTransport`: `NWListener` + `NWBrowser` over
+  `_dstar._udp`, peers identified by their advertised service name.
+  Inbound payloads come back on `onReceive`, peer-set changes on
+  `onPeersChanged`. Symmetric topology (no master election in v1).
+- `NetSession` (`NetSession.swift`) is the orchestrator:
+  - `start()` brings the transport up and begins a 20 Hz status
+    broadcast (every `1 / DStarGameParameters.statusBroadcastHz`).
+  - Inbound `.status` calls `game.applyRemoteSnapshot(...)` which
+    upserts the peer's ship and (re)installs a `RemoteController` for
+    it.
+  - `.leaving` and `.died` remove peers; other message types
+    (missile / scoring / membership / relay) are accepted but not yet
+    acted on — those land in the next slice when we introduce a host
+    authority.
+
+### App + HUD wiring
+
+- `DStarSwiftApp` owns the `NetSession` as a `@StateObject`. When the
+  Metal view's renderer is constructed it publishes its `DStarGameState`
+  through `DStarHUDState.onGameStateReady`, which the app uses to call
+  `net.attach(game:)`.
+- New macOS menu items:
+  - `Multiplayer ▸ Start / Stop Hosting (Bonjour)` — `⌘⇧H`.
+  - `Multiplayer ▸ Spawn Robot` — `⌘B`.
+  - The same menu surfaces the local Bonjour name and the list of
+    currently-discovered peers.
+- Status strip in `ContentView` shows a `net • N peers` badge whenever
+  the session is running.
+
+### What's deliberately not done yet
+
+- Missile allocation (no `missileRequest` / `missileAssigned`).
+- Scoring authority (no `scored`).
+- Host election / master role — currently a flat mesh; OK for LAN
+  testing, swap in once we decide on host-authoritative hit detection.
+- GKMatch transport — protocol is in place for the future drop-in.

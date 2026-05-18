@@ -1,21 +1,25 @@
 import Foundation
 import simd
 
-enum DStarObjectClass: Int {
+enum DStarObjectClass: Int, Codable {
     case empty
     case `static`
     case player
     case missile
+    /// Ship driven by an AutopilotController in this process.
+    case robot
+    /// Ship whose state is replicated from a network peer.
+    case remote
 }
 
-enum DStarObjectState: Int {
+enum DStarObjectState: Int, Codable {
     case active
     case sleeping
     case dead
     case killed
 }
 
-enum DStarGameType: Int {
+enum DStarGameType: Int, Codable {
     case freeForAll
     case teams
 }
@@ -26,7 +30,7 @@ enum DStarBlastState: Int {
     case wait
 }
 
-enum DStarNetStatus: Int {
+enum DStarNetStatus: Int, Codable {
     case unknown
     case slave
     case submaster
@@ -60,6 +64,12 @@ enum DStarGameParameters {
     static let missileLife: Float = 5.0
     static let missileRegen: Float = 0.6
     static let missileRange: Float = 3000.0
+
+    /// Local id of the player ship. Network peers get ids 1+.
+    static let localShipId: Int = 0
+
+    /// How often (Hz) to broadcast our own status to peers.
+    static let statusBroadcastHz: Double = 20.0
 }
 
 struct DStarObject {
@@ -115,11 +125,25 @@ enum DStarInputAction {
     case escape
 }
 
+/// Owns the local player ship (`me`) plus a roster of other ships.
+///
+/// Each ship in the roster has an attached `ShipController` that drives it
+/// every frame:
+///   - the local player uses `PlayerController` (or `AutopilotController`
+///     when the `a` key is toggled),
+///   - spawned robots use `AutopilotController` with `huntsForTargets = true`,
+///   - network peers use `RemoteController`.
+///
+/// `NetSession` calls `applyRemoteSnapshot(_:)` for each incoming
+/// `NET_CURRENT_STATUS`-style message; the controller for that ship records
+/// the snapshot and the next `step()` interpolates it.
 final class DStarGameState {
     var gameType: DStarGameType = .freeForAll
     var blastState: DStarBlastState = .none
     var me = DStarObject()
-    var autoPilot = false
+    var autoPilot = false {
+        didSet { rebuildMeController() }
+    }
     var autoFire = false
     var showHelp = false
     var freezeFrame = false
@@ -129,7 +153,17 @@ final class DStarGameState {
     var dtime: Float = 1 / 60
     var input = DStarInputState()
 
+    /// Every ship other than `me`, keyed by id.
+    private(set) var others: [Int: DStarObject] = [:]
+    /// Controller per ship id (including `me`).
+    private(set) var controllers: [Int: any ShipController] = [:]
+
+    /// Optional callback fired after each step so that `NetSession` can
+    /// broadcast our state without the game state knowing about networking.
+    var onLocalStateAdvanced: ((DStarObject) -> Void)?
+
     init() {
+        me.id = DStarGameParameters.localShipId
         me.position = SIMD3<Float>(
             Float.random(in: -1000...1000),
             Float.random(in: -1000...1000),
@@ -138,7 +172,77 @@ final class DStarGameState {
         me.objectClass = .player
         me.status = .active
         me.speed = DStarGameParameters.defaultSpeed
+        rebuildMeController()
     }
+
+    // MARK: - Roster management
+
+    /// Add or replace a ship in the roster. Used by NetSession when a new
+    /// peer joins and by the spawn-robot UI action.
+    func addShip(_ ship: DStarObject, controller: any ShipController) {
+        guard ship.id != me.id else { return }
+        others[ship.id] = ship
+        controllers[ship.id] = controller
+    }
+
+    func removeShip(id: Int) {
+        others.removeValue(forKey: id)
+        controllers.removeValue(forKey: id)
+    }
+
+    /// Apply a fresh snapshot from a network peer. Idempotent — if the peer
+    /// hasn't been seen yet, a `RemoteController` is created for them.
+    func applyRemoteSnapshot(_ snapshot: DStarObject) {
+        guard snapshot.id != me.id else { return }
+        if let existing = controllers[snapshot.id] as? RemoteController {
+            existing.apply(snapshot)
+            // Keep id/name fields stable; everything else comes from peer.
+            var s = snapshot
+            s.objectClass = .remote
+            others[snapshot.id] = s
+        } else {
+            let controller = RemoteController()
+            controller.apply(snapshot)
+            var s = snapshot
+            s.objectClass = .remote
+            addShip(s, controller: controller)
+        }
+    }
+
+    /// Convenience: spawn a local AI opponent. Returns the id.
+    @discardableResult
+    func spawnRobot(near origin: SIMD3<Float>? = nil) -> Int {
+        let id = nextAvailableLocalRobotId()
+        var ship = DStarObject()
+        ship.id = id
+        ship.name = "Robot \(id)"
+        ship.objectClass = .robot
+        ship.status = .active
+        ship.flags = DStarObjectFlags.robot
+        let center = origin ?? me.position
+        ship.position = center + SIMD3<Float>(
+            Float.random(in: -300...300),
+            Float.random(in: -300...300),
+            Float.random(in: -300...300)
+        )
+        ship.speed = DStarGameParameters.defaultSpeed
+        ship.targetID = me.id
+
+        let ai = AutopilotController()
+        ai.huntsForTargets = true
+        addShip(ship, controller: ai)
+        return id
+    }
+
+    private func nextAvailableLocalRobotId() -> Int {
+        // Robots get ids 1000+ to stay clear of network-assigned peer ids
+        // (which the master allocates in 1...maxPlayers).
+        var id = 1000
+        while others[id] != nil { id += 1 }
+        return id
+    }
+
+    // MARK: - Input
 
     func apply(_ action: DStarInputAction) {
         switch action {
@@ -180,28 +284,67 @@ final class DStarGameState {
         }
     }
 
-    /// Stub — the legacy game cycled through nearby radar contacts here.
-    /// We don't have a fleet of objects yet in the Swift port, so this just
-    /// nudges the targetID and logs. It will become real once the object
-    /// world is populated.
+    /// Cycle radar target through the roster of other ships in id order.
     private func cycleRadarTarget() {
         guard (me.flags & DStarObjectFlags.radar) != 0 else { return }
-        let next = (me.targetID ?? 0) + 1
-        me.targetID = next % max(DStarGameParameters.maxObjects, 1)
+        let ids = others.keys.sorted()
+        guard !ids.isEmpty else {
+            me.targetID = nil
+            return
+        }
+        if let current = me.targetID,
+           let idx = ids.firstIndex(of: current),
+           idx + 1 < ids.count {
+            me.targetID = ids[idx + 1]
+        } else {
+            me.targetID = ids.first
+        }
     }
+
+    // MARK: - Per-frame step
 
     func step(deltaTime: Float) {
         dtime = max(deltaTime, 0)
-        if freezeFrame {
-            return
+        if freezeFrame { return }
+
+        // Drive the local player.
+        let meWorld = ShipWorld(
+            dtime: dtime,
+            others: others,
+            input: input,
+            mouseControl: mouseControl
+        )
+        controllers[me.id]?.step(ship: &me, world: meWorld)
+
+        // Drive every other ship. Each controller sees the rest of the world
+        // (including the freshly-updated `me`) but not its own ship.
+        let snapshotOfMe = me
+        var updated: [Int: DStarObject] = [:]
+        updated.reserveCapacity(others.count)
+        for (id, _) in others {
+            var ship = others[id]!
+            var visibleOthers = others
+            visibleOthers.removeValue(forKey: id)
+            visibleOthers[me.id] = snapshotOfMe
+            let world = ShipWorld(
+                dtime: dtime,
+                others: visibleOthers,
+                input: input,
+                mouseControl: mouseControl
+            )
+            controllers[id]?.step(ship: &ship, world: world)
+            updated[id] = ship
         }
-        controlShip()
+        others = updated
+
+        onLocalStateAdvanced?(me)
     }
+
+    // MARK: - Player keys
 
     private func handleFunctionKey(_ key: Int) {
         switch key {
         case 1:
-            // F1 → toggle on-screen help, matching modern game convention.
             showHelp.toggle()
         case 2:
             armedMissiles += 1
@@ -211,7 +354,6 @@ final class DStarGameState {
                 missilesRemaining -= 1
             }
         case 4:
-            // F4 → autopilot toggle, mirroring 'a'.
             autoPilot.toggle()
             if !autoPilot { autoFire = false }
         default:
@@ -228,7 +370,6 @@ final class DStarGameState {
         case "2":
             me.speed = DStarGameParameters.defaultSpeed
         case "+", "=":
-            // Nudge speed up — handy on a laptop without a numeric row.
             me.speed = min(me.speed + DStarGameParameters.defaultSpeed * 0.25,
                            DStarGameParameters.defaultSpeed * 4)
         case "-", "_":
@@ -239,12 +380,8 @@ final class DStarGameState {
             autoFire = !autoPilot
             fallthrough
         case "a":
-            if autoPilot {
-                autoPilot = false
-                autoFire = false
-            } else {
-                autoPilot = true
-            }
+            autoPilot.toggle()
+            if !autoPilot { autoFire = false }
         case "r":
             me.flags ^= DStarObjectFlags.radar
             if (me.flags & DStarObjectFlags.radar) == 0 {
@@ -260,104 +397,26 @@ final class DStarGameState {
         case "f":
             freezeFrame.toggle()
         case "p":
-            // Debug — matches original 'p' that printed location.
             print(String(format: "pos = (%8.1f, %8.1f, %8.1f)",
                          me.position.x, me.position.y, me.position.z))
+        case "b":
+            // 'b' = spawn a robot, handy for quick local testing.
+            spawnRobot()
         default:
             break
         }
     }
 
-    private func controlShip() {
-        var newDelta = SIMD3<Float>(
-            DStarGameParameters.viewScale * (input.mouseX - 0.5),
-            DStarGameParameters.viewScale * (input.mouseY - 0.5),
-            0
-        )
+    // MARK: - Local controller swap
 
-        if input.arrowLeft { newDelta.x = min(newDelta.x, -0.6) }
-        if input.arrowRight { newDelta.x = max(newDelta.x, 0.6) }
-        if input.arrowUp { newDelta.y = max(newDelta.y, 0.6) }
-        if input.arrowDown { newDelta.y = min(newDelta.y, -0.6) }
+    private let playerController = PlayerController()
+    private let autopilotController: AutopilotController = {
+        let a = AutopilotController()
+        a.huntsForTargets = false
+        return a
+    }()
 
-        if !autoPilot {
-            adjustVector(delta: newDelta)
-            if mouseControl {
-                me.delta.x = newDelta.x
-                me.delta.y = newDelta.y
-            } else {
-                me.delta.x = 0
-                me.delta.y = 0
-            }
-            if input.rightButton {
-                me.flags |= DStarObjectFlags.laser
-            } else {
-                me.flags &= ~DStarObjectFlags.laser
-            }
-            me.delta.z = 0
-        } else {
-            me.delta.x *= 0.9
-            me.delta.y *= 0.9
-            if input.middleButton {
-                me.flags |= DStarObjectFlags.laser
-            }
-            me.delta.z = 0
-        }
-
-        adjustVectors()
-    }
-
-    private func adjustVector(delta: SIMD3<Float>) {
-        me.pointing.x = delta.x * me.right.x + delta.y * me.up.x + me.forward.x
-        me.pointing.y = delta.x * me.right.y + delta.y * me.up.y + me.forward.y
-        me.pointing.z = delta.x * me.right.z + delta.y * me.up.z + me.forward.z
-
-        let mag2 = simd_length_squared(me.pointing)
-        if mag2 > 0, abs(mag2 - 1) > 0.000_001 {
-            me.pointing *= 1 / sqrt(mag2)
-        }
-    }
-
-    private func adjustVectors() {
-        let delta1 = me.delta * dtime
-        var delta2 = SIMD3<Float>(
-            delta1.x * me.right.x + delta1.y * me.up.x,
-            delta1.x * me.right.y + delta1.y * me.up.y,
-            delta1.x * me.right.z + delta1.y * me.up.z
-        )
-
-        var forward2 = me.forward + delta2
-        let forwardLength = simd_length(forward2)
-        if forwardLength > 0 {
-            forward2 /= forwardLength
-        }
-
-        delta2 = SIMD3<Float>(
-            delta1.z * me.right.x,
-            delta1.z * me.right.y,
-            delta1.z * me.right.z
-        )
-        var up2 = me.up + delta2
-
-        var right2 = SIMD3<Float>(
-            forward2.z * up2.y - forward2.y * up2.z,
-            forward2.x * up2.z - forward2.z * up2.x,
-            forward2.y * up2.x - forward2.x * up2.y
-        )
-        let rightLength = simd_length(right2)
-        if rightLength > 0 {
-            right2 /= rightLength
-        }
-
-        up2 = SIMD3<Float>(
-            right2.z * forward2.y - right2.y * forward2.z,
-            right2.x * forward2.z - right2.z * forward2.x,
-            right2.y * forward2.x - right2.x * forward2.y
-        )
-
-        me.position += me.speed * dtime * forward2
-        me.forward = forward2
-        me.up = up2
-        me.right = right2
+    private func rebuildMeController() {
+        controllers[me.id] = autoPilot ? autopilotController : playerController
     }
 }
