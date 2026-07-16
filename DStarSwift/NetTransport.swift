@@ -45,7 +45,14 @@ protocol NetTransport: AnyObject {
 /// LAN find each other. Each instance advertises a unique name that combines
 /// the host's `localHostName` with a short random suffix — that name is the
 /// `PeerId` used throughout the rest of the stack.
-final class BonjourUDPTransport: NetTransport {
+///
+/// The class is `nonisolated` + `@unchecked Sendable`: the project default
+/// actor isolation is `MainActor`, but this transport runs its work on its
+/// own serial dispatch queue and only hops to `callbackQueue` (typically
+/// main) for callbacks. All mutable stored state is touched only on the
+/// private `queue`, which is what "unchecked" means here — the compiler
+/// can't see that invariant, but it holds.
+nonisolated final class BonjourUDPTransport: NetTransport, @unchecked Sendable {
 
     // MARK: Configuration
 
@@ -114,7 +121,7 @@ final class BonjourUDPTransport: NetTransport {
                 domain: Self.serviceDomain
             )
             listener.stateUpdateHandler = { [weak self] state in
-                if case let .ready = state {
+                if case .ready = state {
                     if let p = self?.listener?.port?.rawValue {
                         self?.localPort = p
                     }

@@ -63,13 +63,17 @@ final class NetSession: ObservableObject {
         isRunning = true
         transport.start()
 
-        // Periodic status broadcast.
+        // Periodic status broadcast. The timer is added to the current
+        // (main) run loop; the closure fires on main but the compiler can't
+        // see that, so we use `MainActor.assumeIsolated` to satisfy isolation.
         let hz = DStarGameParameters.statusBroadcastHz
         broadcastTimer = Timer.scheduledTimer(
             withTimeInterval: 1.0 / hz,
             repeats: true
         ) { [weak self] _ in
-            self?.broadcastSelf()
+            MainActor.assumeIsolated {
+                self?.broadcastSelf()
+            }
         }
 
         // Announce ourselves.

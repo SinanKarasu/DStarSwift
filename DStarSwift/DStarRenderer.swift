@@ -227,7 +227,8 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         descriptor.fragmentFunction = library.makeFunction(name: fragment)
         descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
         descriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
-        descriptor.sampleCount = view.sampleCount
+        // `sampleCount` was renamed to `rasterSampleCount` in macOS 13.
+        descriptor.rasterSampleCount = view.sampleCount
         return try? device.makeRenderPipelineState(descriptor: descriptor)
     }
 
