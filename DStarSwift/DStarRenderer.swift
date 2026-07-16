@@ -20,10 +20,34 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
     private var ringworldRoot: BSPNode?
     private var aspect: Float = 1.0
     private var lastFrameTime: CFAbsoluteTime = 0
-    private let gameState = DStarGameState()
+    let gameState = DStarGameState()
     private var drawTrimLines = true
     private weak var attachedView: MTKView?
     private var feedbackFramesRemaining = 0
+
+    /// Optional SwiftUI mirror. The renderer pushes flag changes here each
+    /// frame so the help overlay / HUD can react to in-game key presses,
+    /// and wires the HUD's `onCommand` callback so menu items can send
+    /// input back into the game state.
+    weak var hud: DStarHUDState? {
+        didSet {
+            guard let hud else { return }
+            let game = gameState
+            DispatchQueue.main.async { [weak self] in
+                hud.onCommand = { [weak self] action in
+                    self?.handleInput(action)
+                }
+                hud.onSpawnRobot = { [weak game] in
+                    game?.spawnRobot()
+                }
+                hud.onGameStateReady?(game)
+            }
+        }
+    }
+
+    /// The data source for background stars. Swap this for a `DESIStarfieldSource`
+    /// later without touching the renderer.
+    var starfieldSource: StarfieldSource = SphericalShellStarfield()
 
     private var depthStateFill: MTLDepthStencilState?
     private var depthStateLines: MTLDepthStencilState?
@@ -104,6 +128,13 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         lastFrameTime = now
         gameState.step(deltaTime: delta)
 
+        if let hud {
+            let game = gameState
+            DispatchQueue.main.async {
+                hud.update(from: game)
+            }
+        }
+
         let projection = simd_float4x4.perspective(
             fovY: 65.0 * .pi / 180.0,
             aspect: max(aspect, 0.0001),
@@ -123,7 +154,13 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         if let device {
             var visible: [BSPNode] = []
             BSPUtil.collectVisiblePolygons(node: ringworldRoot, viewer: ship.position, out: &visible)
-            let (triangleVertices, lineVertices) = makeMeshVertices(from: visible)
+            var (triangleVertices, lineVertices) = makeMeshVertices(from: visible)
+
+            // Append every other ship's mesh into the same triangle buffer.
+            // Player ship (`me`) is not drawn — the camera IS its cockpit.
+            for other in gameState.others.values {
+                appendFighterTriangles(for: other, into: &triangleVertices)
+            }
 
             if !triangleVertices.isEmpty {
                 let triBuffer = device.makeBuffer(
@@ -160,29 +197,25 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
     }
 
     private func makeStarBuffer(device: MTLDevice) -> MTLBuffer? {
+        let palette: [SIMD4<Float>] = [
+            SIMD4<Float>(1, 1, 1, 1),   // white
+            SIMD4<Float>(1, 0.4, 0.4, 1), // red giants
+            SIMD4<Float>(0.6, 1, 0.7, 1), // green-tinted
+            SIMD4<Float>(0.6, 0.7, 1, 1), // blue
+        ]
+
+        let points = starfieldSource.makeStars()
         var vertices: [StarVertex] = []
-        vertices.reserveCapacity(LegacyStarfield.points.count)
-
-        let starTotal = LegacyStarfield.points.count
-        let other = starTotal / 8
-        let whiteCount = starTotal - other * 3
-
-        for i in 0..<starTotal {
-            let color: SIMD4<Float>
-            if i < whiteCount {
-                color = SIMD4<Float>(1, 1, 1, 1)
-            } else if i < whiteCount + other {
-                color = SIMD4<Float>(1, 0, 0, 1)
-            } else if i < whiteCount + other * 2 {
-                color = SIMD4<Float>(0, 1, 0, 1)
-            } else {
-                color = SIMD4<Float>(0, 0, 1, 1)
-            }
-
-            vertices.append(StarVertex(position: LegacyStarfield.points[i], color: color))
+        vertices.reserveCapacity(points.count)
+        for star in points {
+            let idx = Int(min(star.colorIndex, 3))
+            var color = palette[idx]
+            color.w = star.magnitude
+            vertices.append(StarVertex(position: star.position, color: color))
         }
 
         starCount = vertices.count
+        guard !vertices.isEmpty else { return nil }
         let length = MemoryLayout<StarVertex>.stride * vertices.count
         return device.makeBuffer(bytes: vertices, length: length)
     }
@@ -227,6 +260,49 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         }
 
         return (triangles, lines)
+    }
+
+    /// Each ship's mesh is in local space (forward = +Z, up = +Y, right = +X).
+    /// Transform by the ship's basis and position to put it in world space.
+    /// The mesh is small (26 polys), so we just expand triangles inline.
+    private func appendFighterTriangles(
+        for ship: DStarObject,
+        into triangles: inout [StarVertex]
+    ) {
+        let scale: Float = 8.0   // bare fighter is ~3 units long; bump for visibility
+        let r = ship.right * scale
+        let u = ship.up * scale
+        let f = ship.forward * scale
+        let p = ship.position
+
+        @inline(__always)
+        func toWorld(_ v: SIMD3<Float>) -> SIMD3<Float> {
+            SIMD3<Float>(
+                v.x * r.x + v.y * u.x + v.z * f.x,
+                v.x * r.y + v.y * u.y + v.z * f.y,
+                v.x * r.z + v.y * u.z + v.z * f.z
+            ) + p
+        }
+
+        for poly in FighterMesh.fighter1 {
+            guard poly.vertices.count >= 3 else { continue }
+            let c = BSPUtil.color(poly.color)
+            let v0 = toWorld(poly.vertices[0])
+            for i in 1..<(poly.vertices.count - 1) {
+                let vi = toWorld(poly.vertices[i])
+                let vj = toWorld(poly.vertices[i + 1])
+                triangles.append(StarVertex(position: v0, color: c))
+                triangles.append(StarVertex(position: vi, color: c))
+                triangles.append(StarVertex(position: vj, color: c))
+                if poly.doubleSided {
+                    // Emit the back face too so the mesh is visible from any angle
+                    // (the depth pipeline does the rest).
+                    triangles.append(StarVertex(position: v0, color: c))
+                    triangles.append(StarVertex(position: vj, color: c))
+                    triangles.append(StarVertex(position: vi, color: c))
+                }
+            }
+        }
     }
 
     private func updateTrimFeedbackUI() {

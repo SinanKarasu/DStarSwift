@@ -79,13 +79,16 @@ final class DStarInputMTKView: MTKView {
     }
 
     private func handleKey(_ event: NSEvent, isDown: Bool) {
+        // macOS virtual key codes — stable across hardware layouts.
         switch event.keyCode {
         case 123: onInput?(.setArrowLeft(isDown))
         case 124: onInput?(.setArrowRight(isDown))
         case 125: onInput?(.setArrowDown(isDown))
         case 126: onInput?(.setArrowUp(isDown))
-        case 120: onInput?(.setFunctionKey(2, isDown))
-        case 99: onInput?(.setFunctionKey(3, isDown))
+        case 122: onInput?(.setFunctionKey(1, isDown))   // F1
+        case 120: onInput?(.setFunctionKey(2, isDown))   // F2
+        case 99:  onInput?(.setFunctionKey(3, isDown))   // F3
+        case 118: onInput?(.setFunctionKey(4, isDown))   // F4
         default: break
         }
 
@@ -98,6 +101,9 @@ final class DStarInputMTKView: MTKView {
                 onInput?(.tab)
                 return
             }
+            // Drop modifier-only events (e.g. holding Cmd alone has no characters).
+            // Cmd-X shortcuts are routed by the menu bar via SwiftUI .commands.
+            if event.modifierFlags.contains(.command) { return }
             if let raw = event.charactersIgnoringModifiers, raw.count == 1 {
                 onInput?(.keyCharacter(raw))
             }
@@ -106,15 +112,19 @@ final class DStarInputMTKView: MTKView {
 }
 
 struct DStarMetalView: NSViewRepresentable {
+    @ObservedObject var hud: DStarHUDState
+
     func makeCoordinator() -> DStarRenderer {
-        DStarRenderer()
+        let renderer = DStarRenderer()
+        renderer.hud = hud
+        return renderer
     }
 
     func makeNSView(context: Context) -> DStarInputMTKView {
         let view = DStarInputMTKView()
         view.device = MTLCreateSystemDefaultDevice()
         view.preferredFramesPerSecond = 60
-        view.clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.2, alpha: 1.0)
+        view.clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.05, alpha: 1.0)
         view.colorPixelFormat = .bgra8Unorm
         view.depthStencilPixelFormat = .depth32Float
         view.sampleCount = 4
@@ -127,19 +137,24 @@ struct DStarMetalView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: DStarInputMTKView, context: Context) {
+        context.coordinator.hud = hud
     }
 }
 #else
 struct DStarMetalView: UIViewRepresentable {
+    @ObservedObject var hud: DStarHUDState
+
     func makeCoordinator() -> DStarRenderer {
-        DStarRenderer()
+        let renderer = DStarRenderer()
+        renderer.hud = hud
+        return renderer
     }
 
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView()
         view.device = MTLCreateSystemDefaultDevice()
         view.preferredFramesPerSecond = 60
-        view.clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.2, alpha: 1.0)
+        view.clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.05, alpha: 1.0)
         view.colorPixelFormat = .bgra8Unorm
         view.depthStencilPixelFormat = .depth32Float
         view.sampleCount = 4
@@ -149,6 +164,7 @@ struct DStarMetalView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: MTKView, context: Context) {
+        context.coordinator.hud = hud
     }
 }
 #endif
