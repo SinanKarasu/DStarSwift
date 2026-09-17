@@ -28,6 +28,22 @@ final class BSPNode {
 }
 
 enum BSPUtil {
+    /// Small deterministic generator used for the legacy gray facets. The C
+    /// game used process-seeded `random()`, but stable colors make macOS,
+    /// visionOS, screenshots, and tests agree on the same reconstructed world.
+    private struct LegacyRandom: RandomNumberGenerator {
+        var state: UInt64
+
+        mutating func next() -> UInt64 {
+            state = state &* 6_364_136_223_846_793_005 &+ 1
+            return state
+        }
+
+        mutating func gray() -> Int16 {
+            DStarColor.darkGray.rawValue + Int16(next() % 4)
+        }
+    }
+
     static func color(_ index: Int16) -> SIMD4<Float> {
         switch index {
         case DStarColor.black.rawValue: return SIMD4<Float>(0, 0, 0, 1)
@@ -128,6 +144,95 @@ enum BSPUtil {
         polys += genRing(r1: radius * 0.25, r2: radius * 0.25, y1: -width2, y2: width2, nlon: nlon, flags: BSPFlags.backView, color: shadowSquare)
 
         return buildBSPTree(polys)
+    }
+
+    /// Port of `gen_sphere()` from the Sun/XGL-era `bsp_utils.c`.
+    static func makeSphereTree(
+        radius: Float,
+        latitudeSegments: Int = 18,
+        longitudeSegments: Int = 36,
+        seed: UInt64 = 0xD57A
+    ) -> BSPNode? {
+        guard radius > 0, latitudeSegments > 1, longitudeSegments > 2 else {
+            return nil
+        }
+
+        var random = LegacyRandom(state: seed)
+        var polygons: [BSPNode] = []
+        polygons.reserveCapacity(latitudeSegments * longitudeSegments)
+
+        var radial1: Float = 0
+        var y1 = radius
+
+        for latitudeIndex in 0..<latitudeSegments {
+            let latitude2 = 90 - 180 * Float(latitudeIndex + 1)
+                / Float(latitudeSegments)
+            let radial2 = radius * cosd(latitude2)
+            let y2 = radius * sind(latitude2)
+            var longitude1: Float = 0
+
+            for longitudeIndex in 0..<longitudeSegments {
+                let longitude2 = 360 * Float(longitudeIndex + 1)
+                    / Float(longitudeSegments)
+                let vertices = [
+                    SIMD3<Float>(cosd(longitude1) * radial1, y1, sind(longitude1) * radial1),
+                    SIMD3<Float>(cosd(longitude1) * radial2, y2, sind(longitude1) * radial2),
+                    SIMD3<Float>(cosd(longitude2) * radial2, y2, sind(longitude2) * radial2),
+                    SIMD3<Float>(cosd(longitude2) * radial1, y1, sind(longitude2) * radial1)
+                ]
+                let node = newPoly(vertices: vertices, color: random.gray(), trimColor: -1)
+                node.flags |= BSPFlags.backView
+                polygons.append(node)
+                longitude1 = longitude2
+            }
+
+            radial1 = radial2
+            y1 = y2
+        }
+
+        return linkConvexBackChain(polygons)
+    }
+
+    /// Exact 80 × 20 × 180 TMA-2 mesh from `monolith_bsp.h`.
+    static func makeMonolithTree() -> BSPNode? {
+        let x: Float = 40
+        let y: Float = 10
+        let z: Float = 90
+        let faces: [([SIMD3<Float>], Int16)] = [
+            ([[-x, -y, -z], [ x, -y, -z], [ x,  y, -z], [-x,  y, -z]], DStarColor.lightGray.rawValue),
+            ([[-x, -y,  z], [ x, -y,  z], [ x,  y,  z], [-x,  y,  z]], DStarColor.lightGray.rawValue),
+            ([[-x, -y, -z], [-x, -y,  z], [-x,  y,  z], [-x,  y, -z]], DStarColor.gray.rawValue),
+            ([[ x, -y, -z], [ x, -y,  z], [ x,  y,  z], [ x,  y, -z]], DStarColor.gray.rawValue),
+            ([[-x, -y, -z], [ x, -y, -z], [ x, -y,  z], [-x, -y,  z]], DStarColor.darkGray.rawValue),
+            ([[-x,  y, -z], [ x,  y, -z], [ x,  y,  z], [-x,  y,  z]], DStarColor.darkGray.rawValue)
+        ]
+        let nodes = faces.map { vertices, color -> BSPNode in
+            let node = newPoly(vertices: vertices, color: color, trimColor: -1)
+            node.flags |= BSPFlags.backView
+            return node
+        }
+        return linkConvexBackChain(nodes.reversed())
+    }
+
+    static func nodes(in root: BSPNode?) -> [BSPNode] {
+        guard let root else { return [] }
+        var result: [BSPNode] = []
+        var stack = [root]
+        while let node = stack.popLast() {
+            result.append(node)
+            if let back = node.backChild { stack.append(back) }
+            if let front = node.frontChild { stack.append(front) }
+        }
+        return result
+    }
+
+    private static func linkConvexBackChain<S: Sequence>(_ input: S) -> BSPNode?
+    where S.Element == BSPNode {
+        let nodes = Array(input)
+        for index in nodes.indices.dropLast() {
+            nodes[index].backChild = nodes[index + 1]
+        }
+        return nodes.first
     }
 
     private static func makeTree(_ list: inout [BSPNode]) -> BSPNode? {

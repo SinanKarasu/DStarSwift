@@ -9,19 +9,21 @@ enum DStarImmersiveSpace {
 
 struct DStarImmersiveView: View {
     @EnvironmentObject private var hud: DStarHUDState
+    @State private var legacyWorld = DStarLegacyWorld()
 
     private let worldScale: Float = 0.001
     private let worldAnchorName = "dstar-world"
     private let hsiAnchorName = "dstar-head-hsi-anchor"
     private let hsiGlobeName = "dstar-head-hsi-globe"
-    private let ringPrefix = "dstar-ring-"
+    private let worldBodyPrefix = "dstar-world-body-"
+    private let worldMaterialPrefix = "dstar-world-material-"
     private let shipPrefix = "dstar-ship-"
 
     var body: some View {
         RealityView { content in
             let anchor = AnchorEntity(world: .zero)
             anchor.name = worldAnchorName
-            anchor.addChild(makeRingworldEntity(scale: worldScale, brightness: hud.ambientLight))
+            anchor.addChild(makeLegacyWorldEntity(scale: worldScale, brightness: hud.ambientLight))
             anchor.addChild(makeStarfieldEntity(scale: worldScale))
             content.add(anchor)
 
@@ -33,7 +35,8 @@ struct DStarImmersiveView: View {
             content.add(hsiAnchor)
         } update: { content in
             if let anchor = content.entities.first(where: { $0.name == worldAnchorName }) {
-                updateRingworld(in: anchor, brightness: hud.ambientLight)
+                legacyWorld.advance(to: hud.simulationTime)
+                updateLegacyWorld(in: anchor, brightness: hud.ambientLight)
                 synchronizeShips(in: anchor, ships: hud.visibleShips)
             }
             updateHeadTrackedHSI(in: content, orientation: hud.orientation)
@@ -143,13 +146,24 @@ struct DStarImmersiveView: View {
         globe.orientation = simd_quatf(basis)
     }
 
-    private func makeRingworldEntity(scale: Float, brightness: Double) -> Entity {
+    private func makeLegacyWorldEntity(scale: Float, brightness: Double) -> Entity {
         let root = Entity()
-        root.name = "dstar-ringworld"
-        guard let tree = BSPUtil.makeRingworldTree() else { return root }
+        root.name = "dstar-legacy-world"
+        for body in legacyWorld.bodies {
+            root.addChild(makeLegacyBodyEntity(body, scale: scale, brightness: brightness))
+        }
+        return root
+    }
 
-        var nodes: [BSPNode] = []
-        collectNodes(tree, into: &nodes)
+    private func makeLegacyBodyEntity(
+        _ body: DStarLegacyBody,
+        scale: Float,
+        brightness: Double
+    ) -> Entity {
+        let root = Entity()
+        root.name = "\(worldBodyPrefix)\(body.kind.rawValue)"
+
+        let nodes = BSPUtil.nodes(in: body.mesh)
 
         var grouped: [Int16: MeshAccumulator] = [:]
         for node in nodes where node.vertices.count >= 3 && node.color >= 0 {
@@ -183,15 +197,23 @@ struct DStarImmersiveView: View {
                 isMetallic: false
             )
             let part = ModelEntity(mesh: mesh, materials: [material])
-            part.name = "\(ringPrefix)\(color)"
+            part.name = "\(worldMaterialPrefix)\(color)"
             root.addChild(part)
         }
 
+        applyLegacyTransform(body.motion, to: root, scale: scale)
         return root
     }
 
-    private func updateRingworld(in root: Entity, brightness: Double) {
-        root.forEachDescendant(withPrefix: ringPrefix) { entity in
+    private func updateLegacyWorld(in root: Entity, brightness: Double) {
+        for body in legacyWorld.bodies {
+            guard let entity = root.findDescendant(
+                named: "\(worldBodyPrefix)\(body.kind.rawValue)"
+            ) else { continue }
+            applyLegacyTransform(body.motion, to: entity, scale: worldScale)
+        }
+
+        root.forEachDescendant(withPrefix: worldMaterialPrefix) { entity in
             guard let model = entity as? ModelEntity,
                   let raw = entity.name.split(separator: "-").last,
                   let color = Int16(raw) else { return }
@@ -203,6 +225,19 @@ struct DStarImmersiveView: View {
                 )
             ]
         }
+    }
+
+    private func applyLegacyTransform(
+        _ motion: DStarObject,
+        to entity: Entity,
+        scale: Float
+    ) {
+        var transform = matrix_identity_float4x4
+        transform.columns.0 = SIMD4<Float>(motion.right, 0)
+        transform.columns.1 = SIMD4<Float>(motion.up, 0)
+        transform.columns.2 = SIMD4<Float>(motion.forward, 0)
+        transform.columns.3 = SIMD4<Float>(motion.position * scale, 1)
+        entity.transform = Transform(matrix: transform)
     }
 
     private func synchronizeShips(in root: Entity, ships: [DStarHUDShip]) {
@@ -304,13 +339,6 @@ struct DStarImmersiveView: View {
         }
     }
 
-    private func collectNodes(_ node: BSPNode?, into out: inout [BSPNode]) {
-        guard let node else { return }
-        out.append(node)
-        collectNodes(node.frontChild, into: &out)
-        collectNodes(node.backChild, into: &out)
-    }
-
     private func uiColor(for index: Int16, brightness: Double) -> UIColor {
         let base: UIColor
         switch index {
@@ -348,6 +376,14 @@ private extension Entity {
             if child.name.hasPrefix(prefix) { body(child) }
             child.forEachDescendant(withPrefix: prefix, body)
         }
+    }
+
+    func findDescendant(named name: String) -> Entity? {
+        for child in children {
+            if child.name == name { return child }
+            if let match = child.findDescendant(named: name) { return match }
+        }
+        return nil
     }
 }
 

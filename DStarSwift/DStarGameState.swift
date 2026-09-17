@@ -157,6 +157,7 @@ final class DStarGameState {
     var missilesRemaining = DStarGameParameters.missilesPerLife
     var armedMissiles = 0
     var dtime: Float = 1 / 60
+    private(set) var elapsedTime: Float = 0
     var input = DStarInputState()
 
     /// Every ship other than `me`, keyed by id.
@@ -351,6 +352,7 @@ final class DStarGameState {
     func step(deltaTime: Float) {
         dtime = max(deltaTime, 0)
         if freezeFrame { return }
+        elapsedTime += dtime
 
         // Drive the local player.
         let meWorld = ShipWorld(

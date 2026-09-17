@@ -17,7 +17,7 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
     private var meshPipeline: MTLRenderPipelineState?
     private var stars: MTLBuffer?
     private var starCount: Int = 0
-    private var ringworldRoot: BSPNode?
+    private let legacyWorld = DStarLegacyWorld()
     private var aspect: Float = 1.0
     private var lastFrameTime: CFAbsoluteTime = 0
     let gameState = DStarGameState()
@@ -74,7 +74,6 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         self.depthStateFill = makeDepthState(device: device, write: true, compare: .less)
         self.depthStateLines = makeDepthState(device: device, write: false, compare: .lessEqual)
 
-        self.ringworldRoot = BSPUtil.makeRingworldTree()
         updateTrimFeedbackUI()
     }
 
@@ -127,6 +126,7 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         let delta = lastFrameTime > 0 ? Float(now - lastFrameTime) : (1 / 60)
         lastFrameTime = now
         gameState.step(deltaTime: delta)
+        legacyWorld.advance(to: gameState.elapsedTime)
 
         if let hud {
             let game = gameState
@@ -156,10 +156,21 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         encoder?.drawPrimitives(type: .point, vertexStart: 0, vertexCount: starCount)
 
         if let device {
-            var visible: [BSPNode] = []
-            BSPUtil.collectVisiblePolygons(node: ringworldRoot, viewer: ship.position, out: &visible)
-            var (triangleVertices, lineVertices) = makeMeshVertices(from: visible)
+            var triangleVertices: [StarVertex] = []
+            var lineVertices: [StarVertex] = []
             var missileLineVertices: [StarVertex] = []
+
+            for body in legacyWorld.bodies {
+                var visible: [BSPNode] = []
+                BSPUtil.collectVisiblePolygons(
+                    node: body.mesh,
+                    viewer: body.localPoint(fromWorld: ship.position),
+                    out: &visible
+                )
+                let bodyVertices = makeMeshVertices(from: visible, body: body)
+                triangleVertices.append(contentsOf: bodyVertices.0)
+                lineVertices.append(contentsOf: bodyVertices.1)
+            }
 
             // Append every other ship's mesh into the same triangle buffer.
             // Player ship (`me`) is not drawn — the camera IS its cockpit.
@@ -243,7 +254,10 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         return try? device.makeRenderPipelineState(descriptor: descriptor)
     }
 
-    private func makeMeshVertices(from nodes: [BSPNode]) -> ([StarVertex], [StarVertex]) {
+    private func makeMeshVertices(
+        from nodes: [BSPNode],
+        body: DStarLegacyBody
+    ) -> ([StarVertex], [StarVertex]) {
         var triangles: [StarVertex] = []
         var lines: [StarVertex] = []
 
@@ -252,19 +266,27 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
 
             if node.color >= 0 {
                 let c = BSPUtil.color(node.color)
-                let base = node.vertices[0]
+                let base = body.worldPoint(fromLocal: node.vertices[0])
                 for i in 1..<(node.vertices.count - 1) {
                     triangles.append(StarVertex(position: base, color: c))
-                    triangles.append(StarVertex(position: node.vertices[i], color: c))
-                    triangles.append(StarVertex(position: node.vertices[i + 1], color: c))
+                    triangles.append(StarVertex(
+                        position: body.worldPoint(fromLocal: node.vertices[i]),
+                        color: c
+                    ))
+                    triangles.append(StarVertex(
+                        position: body.worldPoint(fromLocal: node.vertices[i + 1]),
+                        color: c
+                    ))
                 }
             }
 
             if node.trimColor >= 0 {
                 let c = BSPUtil.color(node.trimColor)
                 for i in 0..<node.vertices.count {
-                    let p0 = node.vertices[i]
-                    let p1 = node.vertices[(i + 1) % node.vertices.count]
+                    let p0 = body.worldPoint(fromLocal: node.vertices[i])
+                    let p1 = body.worldPoint(
+                        fromLocal: node.vertices[(i + 1) % node.vertices.count]
+                    )
                     lines.append(StarVertex(position: p0, color: c))
                     lines.append(StarVertex(position: p1, color: c))
                 }

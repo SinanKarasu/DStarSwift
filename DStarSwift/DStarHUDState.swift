@@ -47,6 +47,7 @@ final class DStarHUDState: ObservableObject {
     @Published private(set) var lockedBy: [String] = []
     @Published private(set) var orientation: DStarHUDOrientation = .identity
     @Published private(set) var visibleShips: [DStarHUDShip] = []
+    @Published private(set) var simulationTime: Float = 0
     /// Effective brightness of lit geometry in the immersive scene. Stars
     /// stay unlit, so zero produces a black world with stars still visible.
     @Published var ambientLight: Double = 0.25
@@ -82,6 +83,7 @@ final class DStarHUDState: ObservableObject {
             armedMissiles = game.armedMissiles
         }
         if score != game.me.score { score = game.me.score }
+        if simulationTime != game.elapsedTime { simulationTime = game.elapsedTime }
 
         let newOrientation = DStarHUDOrientation(
             forward: game.me.forward,
