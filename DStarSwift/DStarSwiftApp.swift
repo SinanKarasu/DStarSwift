@@ -13,7 +13,7 @@ struct DStarSwiftApp: App {
     @StateObject private var net = NetSession()
 
 #if os(visionOS)
-    @State private var immersionStyle: ImmersionStyle = .mixed
+    @State private var immersionStyle: ImmersionStyle = .full
 #endif
 
     init() {
@@ -28,8 +28,8 @@ struct DStarSwiftApp: App {
                 .environmentObject(hud)
                 .environmentObject(net)
                 .onAppear {
-                    hud.onGameStateReady = { [weak net] game in
-                        net?.attach(game: game)
+                    hud.onGameStateReady = { game in
+                        net.attach(game: game)
                     }
                 }
         }

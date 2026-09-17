@@ -117,6 +117,8 @@ Open items captured from the user request:
 
 ## Verification
 
+- Automated suite: `xcodebuild -project DStarSwift.xcodeproj
+  -scheme DStarSwift -destination 'platform=macOS' test`.
 - Build smoke-test: `xcodebuild -project DStarSwift.xcodeproj
   -scheme DStarSwift -destination 'platform=macOS' build`.
 - Manual: launch the macOS app, confirm:
@@ -209,3 +211,31 @@ Landed on `claude/11newfeatures` after the macOS pass:
 - Host election / master role — currently a flat mesh; OK for LAN
   testing, swap in once we decide on host-authoritative hit detection.
 - GKMatch transport — protocol is in place for the future drop-in.
+
+## Automated tests + Mac/visionOS LAN slice — September 2026
+
+- Added the `DStarSwiftTests` macOS unit-test target. Coverage includes input
+  state, pause/radar behavior, ship kinematics, robot creation and pursuit,
+  remote dead-reckoning, Codable wire round-trips, peer identity, robot
+  broadcasts, loopback rejection, and peer cleanup.
+- Bonjour objects now use deterministic per-peer network namespaces instead
+  of every device sending local object id `0`. Each process broadcasts both
+  its player and its locally simulated robots, with owner metadata for clean
+  removal when a peer leaves.
+- Both app targets declare `_dstar._udp`, local-network usage, and incoming /
+  outgoing network capability. Start/stop Bonjour and spawn-robot buttons are
+  available in the visible UI on macOS and visionOS.
+- The immersive RealityKit scene mirrors robot and remote fighter transforms.
+  It defaults to full immersion and provides a 0…100% ambient slider; at zero,
+  lit ringworld geometry is black while unlit stars and ships remain visible.
+- Restored the legacy cockpit HUD as a responsive SwiftUI overlay: the red
+  command card opens on first launch, the blue center sight is always present,
+  score/missile/radar-lock status is live at lower left, and the lower-right
+  wireframe HSI rotates from the player's actual forward/up/right basis.
+- In full immersion, a RealityKit wireframe HSI is attached to a continuously
+  tracked head anchor at a lower-right gaze offset. It follows the wearer while
+  its internal globe continues to rotate from the player ship's attitude.
+- Missile launch now creates a five-second homing roster object instead of only
+  consuming ammunition. Metal renders the original red/yellow line glyph plus
+  an extended tracer wake; RealityKit uses an unlit flare and tail. Flying
+  missiles carry their object class over Bonjour and expire on remote peers.

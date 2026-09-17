@@ -67,10 +67,15 @@ typealias PeerId = String
 /// Encoding strategy: `SIMD3<Float>` is encoded as `[Float]` because Codable
 /// for simd types is platform-quirky and `[Float]` round-trips trivially.
 struct ShipState: Codable, Sendable, Equatable {
+    /// Bonjour service name of the process that owns this object. Older
+    /// packets may omit it, so it remains optional for wire compatibility.
+    var ownerPeer: PeerId?
     var id: Int
     var name: String
     var team: Int
     var score: Int
+    /// Optional so packets from builds predating flying missiles still decode.
+    var objectClass: Int?
     var status: Int             // DStarObjectState raw
     var flags: UInt32
 
@@ -86,11 +91,13 @@ struct ShipState: Codable, Sendable, Equatable {
     var sequence: Int
 
     /// Convert from in-memory `DStarObject`.
-    init(_ ship: DStarObject) {
+    init(_ ship: DStarObject, ownerPeer: PeerId? = nil) {
+        self.ownerPeer = ownerPeer
         id = ship.id
         name = ship.name
         team = ship.team
         score = ship.score
+        objectClass = ship.objectClass.rawValue
         status = ship.status.rawValue
         flags = ship.flags
         position = [ship.position.x, ship.position.y, ship.position.z]
@@ -122,7 +129,7 @@ struct ShipState: Codable, Sendable, Equatable {
         o.speed = speed
         o.targetID = targetID
         o.sequence = sequence
-        o.objectClass = .remote
+        o.objectClass = objectClass.flatMap(DStarObjectClass.init(rawValue:)) ?? .remote
         return o
     }
 

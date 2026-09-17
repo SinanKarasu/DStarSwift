@@ -148,6 +148,68 @@ final class AutopilotController: ShipController {
     }
 }
 
+// MARK: - Missile
+
+/// Homing behavior from the legacy `fly_missiles()` loop. An untargeted or
+/// out-of-cone missile continues straight until its five-second life expires.
+final class MissileController: ShipController {
+    func step(ship: inout DStarObject, world: ShipWorld) {
+        ship.time -= world.dtime
+        guard ship.time > 0 else {
+            ship.status = .dead
+            return
+        }
+
+        if let targetID = ship.targetID,
+           let target = world.others[targetID],
+           target.status == .active {
+            let toTarget = target.position - ship.position
+            let distanceSquared = simd_length_squared(toTarget)
+
+            if distanceSquared <= DStarGameParameters.missileThreshold
+                * DStarGameParameters.missileThreshold {
+                ship.status = .killed
+                return
+            }
+
+            if distanceSquared <= DStarGameParameters.missileRange
+                * DStarGameParameters.missileRange {
+                let distance = max(sqrt(distanceSquared), 0.0001)
+                let direction = toTarget / distance
+                let forwardDot = simd_dot(direction, ship.forward)
+
+                if forwardDot >= 0.7071 {
+                    var dx = simd_dot(toTarget, ship.right)
+                        * DStarGameParameters.missileGain / distance
+                    var dy = simd_dot(toTarget, ship.up)
+                        * DStarGameParameters.missileGain / distance
+                    dx = max(-DStarGameParameters.missileTurn,
+                             min(DStarGameParameters.missileTurn, dx))
+                    dy = max(-DStarGameParameters.missileTurn,
+                             min(DStarGameParameters.missileTurn, dy))
+
+                    let maxChange = DStarGameParameters.missileSlew * world.dtime
+                    ship.delta.x += max(-maxChange, min(maxChange, dx - ship.delta.x))
+                    ship.delta.y += max(-maxChange, min(maxChange, dy - ship.delta.y))
+                    // A tracked target renews life slightly, matching the
+                    // original game's MISSILE_REGEN behavior.
+                    ship.time += DStarGameParameters.missileRegen * world.dtime
+                } else {
+                    ship.targetID = nil
+                }
+            } else {
+                ship.targetID = nil
+            }
+        } else {
+            ship.targetID = nil
+        }
+
+        ship.delta.z = 0
+        ShipKinematics.advance(ship: &ship, dtime: world.dtime)
+        ship.pointing = ship.forward
+    }
+}
+
 // MARK: - Remote
 
 /// State received from a network peer is applied wholesale; we do no local
@@ -167,6 +229,14 @@ final class RemoteController: ShipController {
             ship = snap
             ship.id = keepId
             ship.name = keepName
+            snapshot = nil
+        }
+        if ship.objectClass == .missile {
+            ship.time -= world.dtime
+            guard ship.time > 0 else {
+                ship.status = .dead
+                return
+            }
         }
         // Tiny dead-reckon between snapshots so motion looks smooth at
         // network rates lower than render rate.

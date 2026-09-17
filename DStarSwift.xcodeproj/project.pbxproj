@@ -6,15 +6,50 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		1A0000000000000000000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F785B2A42F3E4EFA00C94267 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F785B2AB2F3E4EFA00C94267;
+			remoteInfo = DStarSwift;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		1A0000000000000000000001 /* DStarSwiftTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DStarSwiftTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		453D8C9A19378ACABD2B7DC6 /* DStarSwiftVision.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DStarSwiftVision.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F785B2AC2F3E4EFA00C94267 /* DStarSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DStarSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1A000000000000000000000C /* Exceptions for "DStarSwift" folder in "DStarSwift" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F785B2AB2F3E4EFA00C94267 /* DStarSwift */;
+		};
+		1A000000000000000000000D /* Exceptions for "DStarSwift" folder in "DStarSwiftVision" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 98D402F4CCDAF8099781DDC1 /* DStarSwiftVision */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		1A0000000000000000000002 /* DStarSwiftTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DStarSwiftTests;
+			sourceTree = "<group>";
+		};
 		F785B2AE2F3E4EFA00C94267 /* DStarSwift */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				1A000000000000000000000C /* Exceptions for "DStarSwift" folder in "DStarSwift" target */,
+				1A000000000000000000000D /* Exceptions for "DStarSwift" folder in "DStarSwiftVision" target */,
 			);
 			path = DStarSwift;
 			sourceTree = "<group>";
@@ -22,6 +57,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		1A0000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		66DDDC21892FD12A6C3A7FFA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -43,6 +85,7 @@
 			isa = PBXGroup;
 			children = (
 				F785B2AE2F3E4EFA00C94267 /* DStarSwift */,
+				1A0000000000000000000002 /* DStarSwiftTests */,
 				F785B2AD2F3E4EFA00C94267 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -52,6 +95,7 @@
 			children = (
 				F785B2AC2F3E4EFA00C94267 /* DStarSwift.app */,
 				453D8C9A19378ACABD2B7DC6 /* DStarSwiftVision.app */,
+				1A0000000000000000000001 /* DStarSwiftTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -59,6 +103,27 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1A0000000000000000000006 /* DStarSwiftTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A000000000000000000000B /* Build configuration list for PBXNativeTarget "DStarSwiftTests" */;
+			buildPhases = (
+				1A0000000000000000000004 /* Sources */,
+				1A0000000000000000000003 /* Frameworks */,
+				1A0000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1A0000000000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				1A0000000000000000000002 /* DStarSwiftTests */,
+			);
+			name = DStarSwiftTests;
+			productName = DStarSwiftTests;
+			productReference = 1A0000000000000000000001 /* DStarSwiftTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		98D402F4CCDAF8099781DDC1 /* DStarSwiftVision */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 20CCD1A74A9193E106C1DF24 /* Build configuration list for PBXNativeTarget "DStarSwiftVision" */;
@@ -109,6 +174,10 @@
 				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
+					1A0000000000000000000006 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = F785B2AB2F3E4EFA00C94267;
+					};
 					98D402F4CCDAF8099781DDC1 = {
 						CreatedOnToolsVersion = 26.3;
 					};
@@ -133,11 +202,19 @@
 			targets = (
 				F785B2AB2F3E4EFA00C94267 /* DStarSwift */,
 				98D402F4CCDAF8099781DDC1 /* DStarSwiftVision */,
+				1A0000000000000000000006 /* DStarSwiftTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		1A0000000000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8B334A3B8742A014F36E627F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -155,6 +232,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1A0000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ACD6C2A26E333C3A9106AE71 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -171,6 +255,14 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		1A0000000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F785B2AB2F3E4EFA00C94267 /* DStarSwift */;
+			targetProxy = 1A0000000000000000000007 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		120826D532F5DF23A7E651F4 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -180,8 +272,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4HVP45GV3U;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DStarSwift/Info.plist;
+				INFOPLIST_KEY_NSBonjourServices = _dstar._udp;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DStar finds nearby players and robots on your local network.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xros*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xrsimulator*]" = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_UIApplicationSupportsMultipleScenes = YES;
@@ -204,6 +301,46 @@
 			};
 			name = Release;
 		};
+		1A0000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 4HVP45GV3U;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = org.bozuk.DStarSwiftTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DStarSwift.app/Contents/MacOS/DStarSwift";
+				TEST_TARGET_NAME = DStarSwift;
+			};
+			name = Debug;
+		};
+		1A000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 4HVP45GV3U;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = org.bozuk.DStarSwiftTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DStarSwift.app/Contents/MacOS/DStarSwift";
+				TEST_TARGET_NAME = DStarSwift;
+			};
+			name = Release;
+		};
 		A6D5EB561061C110807D2CDC /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -212,8 +349,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4HVP45GV3U;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DStarSwift/Info.plist;
+				INFOPLIST_KEY_NSBonjourServices = _dstar._udp;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DStar finds nearby players and robots on your local network.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xros*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xrsimulator*]" = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_UIApplicationSupportsMultipleScenes = YES;
@@ -362,9 +504,14 @@
 				DEVELOPMENT_TEAM = 4HVP45GV3U;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DStarSwift/Info.plist;
+				INFOPLIST_KEY_NSBonjourServices = _dstar._udp;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DStar finds nearby players and robots on your local network.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -406,9 +553,14 @@
 				DEVELOPMENT_TEAM = 4HVP45GV3U;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DStarSwift/Info.plist;
+				INFOPLIST_KEY_NSBonjourServices = _dstar._udp;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DStar finds nearby players and robots on your local network.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -443,6 +595,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1A000000000000000000000B /* Build configuration list for PBXNativeTarget "DStarSwiftTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A0000000000000000000009 /* Debug */,
+				1A000000000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		20CCD1A74A9193E106C1DF24 /* Build configuration list for PBXNativeTarget "DStarSwiftVision" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -64,6 +64,10 @@ enum DStarGameParameters {
     static let missileLife: Float = 5.0
     static let missileRegen: Float = 0.6
     static let missileRange: Float = 3000.0
+    static let missileTurn: Float = 1.0
+    static let missileSlew: Float = 1.0
+    static let missileThreshold: Float = 5.0
+    static let missileGain: Float = 6.0
 
     /// Local id of the player ship. Network peers get ids 1+.
     static let localShipId: Int = 0
@@ -145,7 +149,9 @@ final class DStarGameState {
         didSet { rebuildMeController() }
     }
     var autoFire = false
-    var showHelp = false
+    // The 1986 game opened with its command card visible. Keep that useful
+    // first-run behavior; H/F1/? dismisses it once the pilot is oriented.
+    var showHelp = true
     var freezeFrame = false
     var mouseControl = false
     var missilesRemaining = DStarGameParameters.missilesPerLife
@@ -198,13 +204,13 @@ final class DStarGameState {
             existing.apply(snapshot)
             // Keep id/name fields stable; everything else comes from peer.
             var s = snapshot
-            s.objectClass = .remote
+            s.objectClass = snapshot.objectClass == .missile ? .missile : .remote
             others[snapshot.id] = s
         } else {
             let controller = RemoteController()
             controller.apply(snapshot)
             var s = snapshot
-            s.objectClass = .remote
+            s.objectClass = snapshot.objectClass == .missile ? .missile : .remote
             addShip(s, controller: controller)
         }
     }
@@ -234,10 +240,49 @@ final class DStarGameState {
         return id
     }
 
+    /// Launch one armed missile from the nose of the local ship. Missiles are
+    /// ordinary roster objects, which lets rendering and Bonjour replication
+    /// use the same paths as ships and robots.
+    @discardableResult
+    func launchMissile() -> Int? {
+        guard armedMissiles > 0, missilesRemaining > 0 else { return nil }
+        let flyingMissiles = others.values.filter { $0.objectClass == .missile }.count
+        guard flyingMissiles < DStarGameParameters.maxMissiles else { return nil }
+
+        let id = nextAvailableLocalMissileID()
+        var missile = DStarObject()
+        missile.id = id
+        missile.name = "missile \(id)"
+        missile.team = me.id
+        missile.objectClass = .missile
+        missile.status = .active
+        // Begin just beyond the camera's near plane so the launch flash and
+        // tracer are visible immediately instead of spending a frame clipped.
+        missile.position = me.position + me.forward * 24
+        missile.forward = me.forward
+        missile.up = me.up
+        missile.right = me.right
+        missile.pointing = me.pointing
+        missile.speed = DStarGameParameters.missileSpeed
+        missile.targetID = me.targetID
+        missile.time = DStarGameParameters.missileLife
+
+        addShip(missile, controller: MissileController())
+        armedMissiles -= 1
+        missilesRemaining -= 1
+        return id
+    }
+
     private func nextAvailableLocalRobotId() -> Int {
         // Robots get ids 1000+ to stay clear of network-assigned peer ids
         // (which the master allocates in 1...maxPlayers).
         var id = 1000
+        while others[id] != nil { id += 1 }
+        return id
+    }
+
+    private func nextAvailableLocalMissileID() -> Int {
+        var id = 2000
         while others[id] != nil { id += 1 }
         return id
     }
@@ -333,7 +378,11 @@ final class DStarGameState {
                 mouseControl: mouseControl
             )
             controllers[id]?.step(ship: &ship, world: world)
-            updated[id] = ship
+            if ship.objectClass == .missile && ship.status != .active {
+                controllers.removeValue(forKey: id)
+            } else {
+                updated[id] = ship
+            }
         }
         others = updated
 
@@ -347,12 +396,11 @@ final class DStarGameState {
         case 1:
             showHelp.toggle()
         case 2:
-            armedMissiles += 1
-        case 3:
-            if armedMissiles > 0 && missilesRemaining > 0 {
-                armedMissiles -= 1
-                missilesRemaining -= 1
+            if armedMissiles == 0 && missilesRemaining > 0 {
+                armedMissiles = 1
             }
+        case 3:
+            launchMissile()
         case 4:
             autoPilot.toggle()
             if !autoPilot { autoFire = false }
@@ -388,12 +436,11 @@ final class DStarGameState {
                 me.targetID = nil
             }
         case "q", "Q":
-            armedMissiles += 1
-        case "w", "W":
-            if armedMissiles > 0 && missilesRemaining > 0 {
-                armedMissiles -= 1
-                missilesRemaining -= 1
+            if armedMissiles == 0 && missilesRemaining > 0 {
+                armedMissiles = 1
             }
+        case "w", "W":
+            launchMissile()
         case "f":
             freezeFrame.toggle()
         case "p":

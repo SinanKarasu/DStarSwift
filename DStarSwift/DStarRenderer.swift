@@ -33,14 +33,14 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         didSet {
             guard let hud else { return }
             let game = gameState
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async { [weak self, game] in
                 hud.onCommand = { [weak self] action in
                     self?.handleInput(action)
                 }
                 hud.onSpawnRobot = { [weak game] in
                     game?.spawnRobot()
                 }
-                hud.onGameStateReady?(game)
+                hud.register(gameState: game)
             }
         }
     }
@@ -144,7 +144,11 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
         let ship = gameState.me
         let basis = simd_float4x4.basis(right: ship.right, up: ship.up, forward: ship.forward)
         let viewMatrix = simd_float4x4.rigidInverse(rotationAndBasis: basis, position: ship.position)
-        var uniforms = Uniforms(viewProjection: projection * viewMatrix)
+        // DStar's world is left-handed with +Z forward; Metal's perspective
+        // matrix looks down -Z. The original OpenGL renderer performed this
+        // same conversion with glScaled(1, 1, -1) before applying the view.
+        let dstarToMetal = simd_float4x4(diagonal: SIMD4<Float>(1, 1, -1, 1))
+        var uniforms = Uniforms(viewProjection: projection * dstarToMetal * viewMatrix)
 
         encoder?.setRenderPipelineState(starPipeline)
         encoder?.setVertexBuffer(stars, offset: 0, index: 0)
@@ -155,11 +159,16 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
             var visible: [BSPNode] = []
             BSPUtil.collectVisiblePolygons(node: ringworldRoot, viewer: ship.position, out: &visible)
             var (triangleVertices, lineVertices) = makeMeshVertices(from: visible)
+            var missileLineVertices: [StarVertex] = []
 
             // Append every other ship's mesh into the same triangle buffer.
             // Player ship (`me`) is not drawn — the camera IS its cockpit.
             for other in gameState.others.values {
-                appendFighterTriangles(for: other, into: &triangleVertices)
+                if other.objectClass == .missile {
+                    appendMissileLines(for: other, into: &missileLineVertices)
+                } else {
+                    appendFighterTriangles(for: other, into: &triangleVertices)
+                }
             }
 
             if !triangleVertices.isEmpty {
@@ -174,7 +183,9 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
                 encoder?.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: triangleVertices.count)
             }
 
-            if drawTrimLines, !lineVertices.isEmpty {
+            if !drawTrimLines { lineVertices.removeAll(keepingCapacity: false) }
+            lineVertices.append(contentsOf: missileLineVertices)
+            if !lineVertices.isEmpty {
                 let lineBuffer = device.makeBuffer(
                     bytes: lineVertices,
                     length: MemoryLayout<StarVertex>.stride * lineVertices.count
@@ -304,6 +315,46 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
                 }
             }
         }
+    }
+
+    /// Port of `missile_line.h`, with an extended red tail so a launched
+    /// missile reads as a tracer at modern display resolutions.
+    private func appendMissileLines(
+        for missile: DStarObject,
+        into lines: inout [StarVertex]
+    ) {
+        let red = BSPUtil.color(DStarColor.red.rawValue)
+        let yellow = BSPUtil.color(DStarColor.yellow.rawValue)
+        let scale: Float = 3
+        let r = missile.right * scale
+        let u = missile.up * scale
+        let f = missile.forward * scale
+
+        @inline(__always)
+        func toWorld(_ v: SIMD3<Float>) -> SIMD3<Float> {
+            missile.position + v.x * r + v.y * u + v.z * f
+        }
+
+        @inline(__always)
+        func segment(_ a: SIMD3<Float>, _ b: SIMD3<Float>, color: SIMD4<Float>) {
+            lines.append(StarVertex(position: toWorld(a), color: color))
+            lines.append(StarVertex(position: toWorld(b), color: color))
+        }
+
+        // Red cross and body from the original 1986 line model.
+        segment(SIMD3<Float>(0.5, 0, 0), SIMD3<Float>(-0.5, 0, 0), color: red)
+        segment(SIMD3<Float>(0, 0.5, 0), SIMD3<Float>(0, -0.5, 0), color: red)
+        segment(SIMD3<Float>(0, 0, 3), SIMD3<Float>(0, 0, 0), color: red)
+
+        // Yellow four-stroke flare from missile_line.h.
+        segment(SIMD3<Float>(1.5, 1.5, 0.5), SIMD3<Float>(-1.5, -1.5, -0.5), color: yellow)
+        segment(SIMD3<Float>(-1.5, 1.5, 0.5), SIMD3<Float>(1.5, -1.5, -0.5), color: yellow)
+        segment(SIMD3<Float>(1.5, -1.5, 0.5), SIMD3<Float>(-1.5, 1.5, -0.5), color: yellow)
+        segment(SIMD3<Float>(-1.5, -1.5, 0.5), SIMD3<Float>(1.5, 1.5, -0.5), color: yellow)
+
+        // The legacy three-unit body becomes almost sub-pixel on a Retina
+        // display, so extend a bright wake behind it to make flight legible.
+        segment(SIMD3<Float>(0, 0, -18), SIMD3<Float>(0, 0, 0), color: red)
     }
 
     private func updateTrimFeedbackUI() {
