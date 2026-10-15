@@ -6,6 +6,20 @@ RealityKit immersive scene on visionOS.
 Features include the legacy world and starfield, ship controls, radar and HUD,
 missiles, robot opponents, and Bonjour multiplayer discovery.
 
+## Origins and credits
+
+**DStar was originally written by Ed Falk.** The original game used Sun's XGL
+graphics library. Ed later ported DStar to OpenGL for Linux, bringing the game
+from its Sun/XGL roots to Linux systems.
+
+DStarSwift continues that lineage: **XGL → OpenGL on Linux → Swift and Metal**.
+This port adapts the legacy C/OpenGL game to Swift, SwiftUI, and Metal, with
+RealityKit providing the visionOS immersive scene. It carries forward the
+original game's world, ship models, controls, and gameplay concepts.
+
+Credit for the original DStar game and its Linux OpenGL port belongs to
+**Ed Falk**. The Swift/Metal port is by **Sinan Karasu**.
+
 ## Run
 
 Open `DStarSwift.xcodeproj` in Xcode with the macOS and visionOS SDKs installed.
