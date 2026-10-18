@@ -25,6 +25,7 @@ struct DStarImmersiveView: View {
             anchor.name = worldAnchorName
             anchor.addChild(makeLegacyWorldEntity(scale: worldScale, brightness: hud.ambientLight))
             anchor.addChild(makeStarfieldEntity(scale: worldScale))
+            anchor.addChild(makeHabitatEntity())
             content.add(anchor)
 
             // Keep the flight instrument in a stable lower-right position in
@@ -37,6 +38,7 @@ struct DStarImmersiveView: View {
             if let anchor = content.entities.first(where: { $0.name == worldAnchorName }) {
                 legacyWorld.advance(to: hud.simulationTime)
                 updateLegacyWorld(in: anchor, brightness: hud.ambientLight)
+                updateHabitat(in: anchor)
                 synchronizeShips(in: anchor, ships: hud.visibleShips)
             }
             updateHeadTrackedHSI(in: content, orientation: hud.orientation)
@@ -144,6 +146,43 @@ struct DStarImmersiveView: View {
         basis.columns.1 = SIMD4<Float>(orientation.up, 0)
         basis.columns.2 = SIMD4<Float>(orientation.forward, 0)
         globe.orientation = simd_quatf(basis)
+    }
+
+    private func makeHabitatEntity() -> Entity {
+        let root = Entity()
+        root.name = "world-v2"
+        guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime)) else { return root }
+        for item in items {
+            var descriptor = MeshDescriptor(name: item.geometry.id)
+            descriptor.positions = MeshBuffer(item.geometry.positions.map { $0 * worldScale })
+            descriptor.primitives = .triangles(item.geometry.indices)
+            guard let mesh = try? MeshResource.generate(from: [descriptor]) else { continue }
+            let c = item.geometry.color
+            let material = UnlitMaterial(color: UIColor(red: CGFloat(c.x), green: CGFloat(c.y),
+                                                       blue: CGFloat(c.z), alpha: CGFloat(c.w)))
+            let part = ModelEntity(mesh: mesh, materials: [material])
+            part.name = item.id
+            root.addChild(part)
+        }
+        applyHabitatSnapshot(to: root)
+        return root
+    }
+
+    private func updateHabitat(in anchor: Entity) {
+        guard let root = anchor.children.first(where: { $0.name == "world-v2" }) else { return }
+        applyHabitatSnapshot(to: root)
+    }
+
+    private func applyHabitatSnapshot(to root: Entity) {
+        guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime)) else { return }
+        for item in items {
+            guard let part = root.children.first(where: { $0.name == item.id }) else { continue }
+            part.position = SIMD3<Float>(item.pose.position) * worldScale
+            part.orientation = simd_quatf(ix: Float(item.pose.orientation.imag.x),
+                                         iy: Float(item.pose.orientation.imag.y),
+                                         iz: Float(item.pose.orientation.imag.z),
+                                         r: Float(item.pose.orientation.real))
+        }
     }
 
     private func makeLegacyWorldEntity(scale: Float, brightness: Double) -> Entity {

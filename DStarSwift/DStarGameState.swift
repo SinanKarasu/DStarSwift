@@ -127,6 +127,7 @@ enum DStarInputAction {
     case keyCharacter(String)
     case tab
     case escape
+    case visitHabitat
 }
 
 /// Owns the local player ship (`me`) plus a roster of other ships.
@@ -327,6 +328,19 @@ final class DStarGameState {
             cycleRadarTarget()
         case .escape:
             freezeFrame.toggle()
+        case .visitHabitat:
+            me.position = SIMD3<Float>(350, 600, 550)
+            me.forward = simd_normalize(SIMD3<Float>(0, -600, 750))
+            me.right = SIMD3<Float>(1, 0, 0)
+            me.up = simd_cross(me.forward, me.right)
+            me.delta = .zero
+            me.speed = 0
+            me.flags &= ~DStarObjectFlags.laser
+            input = DStarInputState()
+            mouseControl = false
+            autoPilot = false
+            autoFire = false
+            rebuildMeController()
         }
     }
 

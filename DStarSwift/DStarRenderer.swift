@@ -172,6 +172,22 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
                 lineVertices.append(contentsOf: bodyVertices.1)
             }
 
+            triangleVertices = triangleVertices.map {
+                StarVertex(position: $0.position - ship.position, color: $0.color)
+            }
+
+            // Both backends consume the same procedural geometry and frame snapshot.
+            if let items = try? DStarWorld.arrival.snapshot(at: Double(gameState.elapsedTime)) {
+                for item in items {
+                    for index in item.geometry.indices {
+                        triangleVertices.append(StarVertex(
+                            position: item.pose.renderPoint(item.geometry.positions[Int(index)], relativeTo: SIMD3<Double>(ship.position)),
+                            color: item.geometry.color))
+                    }
+                }
+            }
+
+            let habitatVertexCount = triangleVertices.count
             // Append every other ship's mesh into the same triangle buffer.
             // Player ship (`me`) is not drawn — the camera IS its cockpit.
             for other in gameState.others.values {
@@ -180,6 +196,19 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
                 } else {
                     appendFighterTriangles(for: other, into: &triangleVertices)
                 }
+            }
+
+            for index in habitatVertexCount..<triangleVertices.count {
+                triangleVertices[index].position -= ship.position
+            }
+            // Stars retain the legacy world-space camera; mesh geometry uses a nearby origin.
+            let relativeView = simd_float4x4.rigidInverse(rotationAndBasis: basis, position: .zero)
+            uniforms = Uniforms(viewProjection: projection * dstarToMetal * relativeView)
+            lineVertices = lineVertices.map {
+                StarVertex(position: $0.position - ship.position, color: $0.color)
+            }
+            missileLineVertices = missileLineVertices.map {
+                StarVertex(position: $0.position - ship.position, color: $0.color)
             }
 
             if !triangleVertices.isEmpty {

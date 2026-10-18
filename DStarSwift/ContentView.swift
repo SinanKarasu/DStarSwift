@@ -67,6 +67,11 @@ struct ContentView: View {
                     .buttonStyle(.bordered)
                 }
 
+#if os(macOS)
+                Button("Visit Cylinder") { hud.onCommand?(.visitHabitat) }
+                    .buttonStyle(.bordered)
+#endif
+
                 Spacer()
             }
             .padding()
