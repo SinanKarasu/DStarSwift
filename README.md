@@ -36,13 +36,14 @@ Open `DStarSwift.xcodeproj` in Xcode with the macOS and visionOS SDKs installed.
 - Use the on-screen help for controls. Bonjour multiplayer requires local
   network access.
 
-The project currently targets macOS 26.2 and visionOS 26.2 or later.
+The project currently targets macOS 26.2 and visionOS 27.0 or later.
 The scene manifest in `DStarSwift/Info.plist` enables multiple scenes, which
 visionOS requires to open the immersive space alongside the main window.
 
 ## Documentation
 
 - [User Manual](USER_MANUAL.md): first flight, controls, robots, multiplayer, and immersive mode.
+- [Coordinate Architecture](COORDINATE_ARCHITECTURE.md): universal precision, local frames, and spatial UI.
 - [Roadmap](ROADMAP.md): proposed priorities and historical features to revisit.
 - [Porting Plan](PORTING_PLAN.md): implementation notes and development history.
 

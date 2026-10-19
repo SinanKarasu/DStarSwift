@@ -19,8 +19,9 @@ again, including backwards, does not accumulate integration error.
 Conventions are metres, seconds, +Y up, and DStar's +Z forward. The v2 region
 uses one metre per legacy game unit for this first integration. The existing
 legacy simulation retains its original units and single-precision state.
-The new pose API subtracts a render origin in Double before producing Float
-vertices. Metal uses the player's position as that origin for habitat geometry;
+Universal frame positions now use integer sector addresses plus bounded local
+offsets. Snapshots subtract the observer address before producing local Double
+poses and Float vertices. See [Coordinate Architecture](COORDINATE_ARCHITECTURE.md). Metal uses the player's position as that origin for habitat geometry;
 legacy triangles and lines are also shifted into the resulting nearby render
 space. The player simulation itself is still Float, so this is a foundation
 for large worlds, not a completed astronomical-scale flight system.

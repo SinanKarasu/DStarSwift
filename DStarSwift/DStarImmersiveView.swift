@@ -23,7 +23,9 @@ struct DStarImmersiveView: View {
             anchor.name = worldAnchorName
             anchor.addChild(makeLegacyWorldEntity(scale: worldScale, brightness: hud.ambientLight))
             anchor.addChild(makeStarfieldEntity(scale: worldScale))
-            anchor.addChild(makeHabitatEntity())
+            let habitat = makeHabitatEntity()
+            content.add(habitat)
+            applyCamera(to: habitat, cameraRelative: true)
             content.add(anchor)
             applyCamera(to: anchor)
             if let panel = attachments.entity(for: "navigation") {
@@ -35,7 +37,10 @@ struct DStarImmersiveView: View {
             if let anchor = content.entities.first(where: { $0.name == worldAnchorName }) {
                 legacyWorld.advance(to: hud.simulationTime)
                 updateLegacyWorld(in: anchor, brightness: hud.ambientLight)
-                updateHabitat(in: anchor)
+                if let habitat = content.entities.first(where: { $0.name == "world-v2" }) {
+                    applyHabitatSnapshot(to: habitat)
+                    applyCamera(to: habitat, cameraRelative: true)
+                }
                 synchronizeShips(in: anchor, ships: hud.visibleShips)
                 applyCamera(to: anchor)
             }
@@ -49,7 +54,7 @@ struct DStarImmersiveView: View {
 
     /// Reflect DStar +Z into RealityKit -Z after applying the inverse cockpit pose.
     /// Head tracking remains entirely under RealityKit's control.
-    private func applyCamera(to root: Entity) {
+    private func applyCamera(to root: Entity, cameraRelative: Bool = false) {
         let camera = hud.look.orientation(relativeTo: hud.orientation)
         let basis = simd_float3x3(columns: (camera.right, camera.up, camera.forward))
         let inverse = simd_quatf(basis).inverse
@@ -57,14 +62,15 @@ struct DStarImmersiveView: View {
                                    iz: inverse.imag.z, r: inverse.real)
         root.scale = SIMD3<Float>(1, 1, -1)
         root.orientation = reflected
-        root.position = reflected.act(SIMD3<Float>(-hud.position.x, -hud.position.y,
+        root.position = cameraRelative ? .zero : reflected.act(SIMD3<Float>(-hud.position.x, -hud.position.y,
                                                    hud.position.z) * worldScale)
     }
 
     private func makeHabitatEntity() -> Entity {
         let root = Entity()
         root.name = "world-v2"
-        guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime)) else { return root }
+        guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime),
+            relativeTo: try WorldPosition(offset: SIMD3<Double>(hud.position))) else { return root }
         for item in items {
             var descriptor = MeshDescriptor(name: item.geometry.id)
             descriptor.positions = MeshBuffer(item.geometry.positions.map { $0 * worldScale })
@@ -81,13 +87,9 @@ struct DStarImmersiveView: View {
         return root
     }
 
-    private func updateHabitat(in anchor: Entity) {
-        guard let root = anchor.children.first(where: { $0.name == "world-v2" }) else { return }
-        applyHabitatSnapshot(to: root)
-    }
-
     private func applyHabitatSnapshot(to root: Entity) {
-        guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime)) else { return }
+        guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime),
+            relativeTo: try WorldPosition(offset: SIMD3<Double>(hud.position))) else { return }
         for item in items {
             guard let part = root.children.first(where: { $0.name == item.id }) else { continue }
             part.position = SIMD3<Float>(item.pose.position) * worldScale

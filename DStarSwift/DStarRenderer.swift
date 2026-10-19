@@ -179,11 +179,12 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
             }
 
             // Both backends consume the same procedural geometry and frame snapshot.
-            if let items = try? DStarWorld.arrival.snapshot(at: Double(gameState.elapsedTime)) {
+            if let items = try? DStarWorld.arrival.snapshot(at: Double(gameState.elapsedTime),
+                relativeTo: try WorldPosition(offset: SIMD3<Double>(ship.position))) {
                 for item in items {
                     for index in item.geometry.indices {
                         triangleVertices.append(StarVertex(
-                            position: item.pose.renderPoint(item.geometry.positions[Int(index)], relativeTo: SIMD3<Double>(ship.position)),
+                            position: item.pose.renderPoint(item.geometry.positions[Int(index)], relativeTo: .zero),
                             color: item.geometry.color))
                     }
                 }

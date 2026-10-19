@@ -14,7 +14,7 @@ The original document describes historical behavior that is not all implemented 
 1. Open `DStarSwift.xcodeproj` in Xcode with the required platform SDKs installed.
 2. For macOS, choose the **DStarSwift** scheme and **My Mac**. For visionOS,
    choose **DStarSwiftVision** and an Apple Vision Pro device or simulator.
-3. Build and run. The project targets macOS 26.2 and visionOS 26.2 or later.
+3. Build and run. The project targets macOS 26.2 and visionOS 27.0 or later.
 4. On Mac, click near the center of the game view to enable mouse steering.
 5. Choose **Spawn Robot** to add a nearby AI ship for practice.
 6. Press **r**, then **Tab**, to select a target. Try **a** for autopilot,

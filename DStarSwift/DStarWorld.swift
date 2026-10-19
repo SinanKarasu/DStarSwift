@@ -22,6 +22,8 @@ struct WorldFrame {
     var pose = WorldPose()
     /// Radians per second about local +Y, evaluated from the simulation epoch.
     var spin: Double = 0
+    /// Only root frames may define a universal anchor.
+    var anchor: WorldPosition = .zero
 }
 
 struct WorldGeometry {
@@ -50,6 +52,8 @@ enum WorldDefinitionError: Error, Equatable {
     case missingFrame(String)
     case cyclicFrame(String)
     case invalidTime
+    case invalidFrame(String)
+    case anchoredChild(String)
 }
 
 /// Immutable definitions are shared by both rendering adapters. No GPU or RealityKit types.
@@ -57,35 +61,108 @@ struct DStarWorld {
     let frames: [WorldFrame]
     let instances: [WorldInstance]
 
-    func snapshot(at time: Double) throws -> [WorldDrawItem] {
+    private struct ResolvedFrame {
+        var position: WorldPosition
+        var orientation: simd_quatd
+    }
+
+    private func definitions(at time: Double) throws -> [String: WorldFrame] {
         guard time.isFinite else { throw WorldDefinitionError.invalidTime }
-        var definitions: [String: WorldFrame] = [:]
+        var result: [String: WorldFrame] = [:]
         for frame in frames {
-            guard definitions[frame.id] == nil else {
-                throw WorldDefinitionError.duplicateFrame(frame.id)
+            guard result[frame.id] == nil else { throw WorldDefinitionError.duplicateFrame(frame.id) }
+            guard frame.pose.position.allFinite, frame.spin.isFinite,
+                  frame.pose.orientation.vector.allFinite,
+                  simd_length_squared(frame.pose.orientation.vector) > 0 else {
+                throw WorldDefinitionError.invalidFrame(frame.id)
             }
-            definitions[frame.id] = frame
-        }
-        var resolved: [String: WorldPose] = [:]
-        var visiting = Set<String>()
-        func resolve(_ id: String) throws -> WorldPose {
-            if let pose = resolved[id] { return pose }
-            guard let frame = definitions[id] else { throw WorldDefinitionError.missingFrame(id) }
-            guard visiting.insert(id).inserted else { throw WorldDefinitionError.cyclicFrame(id) }
-            var local = frame.pose
-            local.orientation = simd_normalize(local.orientation * simd_quatd(
-                angle: (frame.spin * time).truncatingRemainder(dividingBy: 2 * .pi),
+            if frame.parent != nil && frame.anchor != .zero { throw WorldDefinitionError.anchoredChild(frame.id) }
+            var evaluated = frame
+            evaluated.pose.orientation = simd_normalize(frame.pose.orientation * simd_quatd(
+                angle: frame.spin * time.truncatingRemainder(dividingBy: frame.spin == 0 ? 1 : 2 * .pi / abs(frame.spin)),
                 axis: SIMD3<Double>(0, 1, 0)))
-            let pose = try frame.parent.map { try resolve($0).applying(local) } ?? local
-            visiting.remove(id)
-            resolved[id] = pose
-            return pose
+            result[frame.id] = evaluated
         }
-        // Validate unused frames as well, so authoring mistakes cannot stay hidden.
-        for frame in frames { _ = try resolve(frame.id) }
+        // Validate every branch, including ones with no geometry.
+        for frame in frames {
+            var path = Set<String>()
+            var next: String? = frame.id
+            while let id = next {
+                guard path.insert(id).inserted else { throw WorldDefinitionError.cyclicFrame(id) }
+                guard let current = result[id] else { throw WorldDefinitionError.missingFrame(id) }
+                next = current.parent
+            }
+        }
+        return result
+    }
+
+    /// Output poses are relative to the supplied observer, never absolute astronomical Doubles.
+    func snapshot(at time: Double, relativeTo origin: WorldPosition = .zero) throws -> [WorldDrawItem] {
+        let definitions = try definitions(at: time)
+        var resolved: [String: ResolvedFrame] = [:]
+        func resolve(_ id: String) throws -> ResolvedFrame {
+            if let value = resolved[id] { return value }
+            guard let frame = definitions[id] else { throw WorldDefinitionError.missingFrame(id) }
+            let result: ResolvedFrame
+            if let parent = frame.parent {
+                let base = try resolve(parent)
+                result = ResolvedFrame(position: try base.position.adding(metres: base.orientation.act(frame.pose.position)),
+                                       orientation: simd_normalize(base.orientation * frame.pose.orientation))
+            } else {
+                result = ResolvedFrame(position: try frame.anchor.adding(metres: frame.pose.position),
+                                       orientation: frame.pose.orientation)
+            }
+            resolved[id] = result
+            return result
+        }
         return try instances.map {
-            WorldDrawItem(id: $0.id, pose: try resolve($0.frame), geometry: $0.geometry)
+            let frame = try resolve($0.frame)
+            return WorldDrawItem(id: $0.id,
+                                 pose: WorldPose(position: frame.position.metres(relativeTo: origin),
+                                                 orientation: frame.orientation), geometry: $0.geometry)
         }
+    }
+
+    /// Resolve locally via the lowest shared ancestor. A huge ancestor translation
+    /// never participates in a calculation between two objects inside that frame.
+    func displacement(from source: WorldLocation, to target: WorldLocation, at time: Double) throws -> SIMD3<Double> {
+        let definitions = try definitions(at: time)
+        func chain(_ location: WorldLocation) throws -> [(String, WorldPose)] {
+            var values: [(String, WorldPose)] = []
+            var id = location.frame
+            var pose = WorldPose(position: location.offset)
+            while true {
+                guard let frame = definitions[id] else { throw WorldDefinitionError.missingFrame(id) }
+                values.append((id, pose))
+                guard let parent = frame.parent else { break }
+                pose = frame.pose.applying(pose)
+                id = parent
+            }
+            return values
+        }
+        let sources = try chain(source)
+        let targets = try chain(target)
+        for (id, start) in sources {
+            if let end = targets.first(where: { $0.0 == id })?.1 {
+                // Return a vector in the source frame's axes, not its parent's axes.
+                return start.orientation.inverse.act(end.position - start.position)
+            }
+        }
+        // Separate roots: subtract universal addresses, then rotate into source axes.
+        func absolute(_ location: WorldLocation, _ chain: [(String, WorldPose)]) throws -> ResolvedFrame {
+            var result = ResolvedFrame(position: .zero, orientation: simd_quatd(angle: 0, axis: SIMD3(0, 1, 0)))
+            for (id, _) in chain.reversed() {
+                let frame = definitions[id]!
+                if frame.parent == nil { result.position = frame.anchor }
+                result.position = try result.position.adding(metres: result.orientation.act(frame.pose.position))
+                result.orientation = simd_normalize(result.orientation * frame.pose.orientation)
+            }
+            result.position = try result.position.adding(metres: result.orientation.act(location.offset))
+            return result
+        }
+        let start = try absolute(source, sources)
+        let end = try absolute(target, targets)
+        return start.orientation.inverse.act(end.position.metres(relativeTo: start.position))
     }
 
     static let arrival = DStarWorld(
@@ -149,4 +226,11 @@ enum HabitatGeometry {
         surface(id: "hub", radius: 18, y0: -350, y1: 350,
                 color: SIMD4(0.9, 0.65, 0.2, 1)) { _ in true }
     }
+}
+
+private extension SIMD3 where Scalar == Double {
+    var allFinite: Bool { x.isFinite && y.isFinite && z.isFinite }
+}
+private extension SIMD4 where Scalar == Double {
+    var allFinite: Bool { x.isFinite && y.isFinite && z.isFinite && w.isFinite }
 }
