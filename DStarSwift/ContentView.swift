@@ -14,8 +14,6 @@ struct ContentView: View {
 #if os(visionOS)
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
-    @State private var isImmersiveActive = false
-    @State private var immersiveStatus = "Windowed"
 #endif
 
     var body: some View {
@@ -41,14 +39,15 @@ struct ContentView: View {
                 .padding(10)
                 .background(.ultraThinMaterial, in: Capsule())
 
-                Button(isImmersiveActive ? "Exit Immersive" : "Enter Immersive") {
+                Button(hud.isImmersiveActive ? "Exit Immersive" : "Enter Immersive") {
                     Task {
                         await toggleImmersiveSpace()
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(hud.isImmersiveTransitioning)
 
-                Text(immersiveStatus)
+                Text(hud.immersiveStatus)
                     .font(.caption)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -113,27 +112,31 @@ struct ContentView: View {
 #if os(visionOS)
     @MainActor
     private func toggleImmersiveSpace() async {
-        if isImmersiveActive {
+        guard !hud.isImmersiveTransitioning else { return }
+        hud.isImmersiveTransitioning = true
+        defer { hud.isImmersiveTransitioning = false }
+
+        if hud.isImmersiveActive {
             hud.onCommand?(.setGlobeSteering(.zero))
             await dismissImmersiveSpace()
-            isImmersiveActive = false
-            immersiveStatus = "Windowed"
+            hud.isImmersiveActive = false
+            hud.immersiveStatus = "Windowed"
             return
         }
 
         switch await openImmersiveSpace(id: DStarImmersiveSpace.id) {
         case .opened:
-            isImmersiveActive = true
-            immersiveStatus = "Immersive Active"
+            hud.isImmersiveActive = true
+            hud.immersiveStatus = "Immersive Active"
         case .userCancelled:
-            isImmersiveActive = false
-            immersiveStatus = "Immersive Cancelled"
+            hud.isImmersiveActive = false
+            hud.immersiveStatus = "Immersive Cancelled"
         case .error:
-            isImmersiveActive = false
-            immersiveStatus = "Immersive Error"
+            hud.isImmersiveActive = false
+            hud.immersiveStatus = "Immersive Error"
         @unknown default:
-            isImmersiveActive = false
-            immersiveStatus = "Immersive Unknown State"
+            hud.isImmersiveActive = false
+            hud.immersiveStatus = "Immersive Unknown State"
         }
     }
 #endif
