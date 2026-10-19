@@ -54,6 +54,10 @@ final class PlayerController: ShipController {
             ship.delta.x = 0
             ship.delta.y = 0
         }
+        if world.input.globeSteering != .zero {
+            ship.delta.x = world.input.globeSteering.x * 0.75
+            ship.delta.y = world.input.globeSteering.y * 0.75
+        }
         if world.input.rightButton {
             ship.flags |= DStarObjectFlags.laser
         } else {

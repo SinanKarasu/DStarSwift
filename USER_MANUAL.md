@@ -20,9 +20,9 @@ The original document describes historical behavior that is not all implemented 
 6. Press **r**, then **Tab**, to select a target. Try **a** for autopilot,
    or **q** followed by **w** to arm and launch a missile.
 
-The mouse and keyboard flight controls below are implemented in the macOS view.
-The visionOS view currently provides on-screen controls and an immersive scene;
-it does not yet wire the same flight-input handlers into its Metal view.
+The mouse and keyboard shortcuts below are implemented in the macOS view.
+Both platforms also provide an interactive navigation globe in the game window;
+visionOS provides the same panel inside the immersive scene.
 
 ## World engine v2 destination
 
@@ -33,6 +33,26 @@ placeholders, silver rims, and a stationary gold axial hub. Docking, collisions,
 and habitat gravity are not implemented yet. The same geometry appears in the
 visionOS immersive scene; immersive navigation remains a separate development step.
 See [World Engine v2](WORLD_ENGINE_V2.md) for placement and implementation details.
+
+## Interactive navigation globe
+
+Choose **Look**, then drag the globe with a mouse or look at it and pinch-drag
+on Vision Pro. Horizontal movement looks left/right; vertical movement looks
+up/down. Release keeps the view offset without changing the ship heading.
+**Center View** returns to the ship's forward view. The wire globe remains tied
+to ship orientation; a cyan marker indicates the view direction relative to the
+white ship-heading marker. Head movement remains independent in immersive mode.
+
+Choose **Steer** to use drag displacement as a virtual joystick. A small central
+dead zone suppresses accidental input; larger drags turn faster. Releasing or
+cancelling a gesture stops the turning command. Steering takes manual control
+from autopilot and disables mouse-fly. Looking and steering remain separate:
+use Center View before steering if you want to face straight ahead.
+
+The panel also provides **Stop**, **½ Speed**, and **Pause/Resume**. The immersive
+panel is placed in front and to the right of the initial room origin, rather
+than following your head. If you walk away, look back toward that position.
+This first version needs physical-headset comfort and pinch-gesture validation.
 
 ## Flying on Mac
 
@@ -137,8 +157,8 @@ the app is windowed, active, cancelled, or encountered an error.
 
 The scene includes the legacy world, stars, replicated ship visuals, and a
 head-relative orientation globe. Use the sun slider in the main window to
-adjust ambient brightness. Full spatial flight controls and cockpit interaction
-are future work.
+adjust ambient brightness. The navigation globe supports looking and steering; a fuller cockpit control
+panel and weapons controls remain future work.
 
 If opening fails, rebuild the current project and retry. Its Info.plist enables
 multiple scenes, which is required to open the immersive space alongside the

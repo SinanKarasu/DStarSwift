@@ -29,8 +29,8 @@ Both renderers evaluate the same definition at the HUD/game simulation time.
 Metal expands the shared indexed triangles into its existing vertex stream.
 RealityKit uploads shared geometry once and updates entity poses on subsequent
 snapshots. Its current 0.001 world display scale is retained, so 1,000 game units
-span one metre of immersive scene. The existing immersive placement convention
-is retained; ship-relative immersive navigation is a separate task.
+span one metre of immersive scene. Immersive rendering now applies the inverse ship/view pose, with +Z converted
+to RealityKit -Z. The navigation panel remains outside that world transform.
 
 ## First destination
 

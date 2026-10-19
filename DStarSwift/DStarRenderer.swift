@@ -142,7 +142,9 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
             farZ: 10_000.0
         )
         let ship = gameState.me
-        let basis = simd_float4x4.basis(right: ship.right, up: ship.up, forward: ship.forward)
+        let camera = gameState.look.orientation(relativeTo: DStarHUDOrientation(
+            forward: ship.forward, up: ship.up, right: ship.right))
+        let basis = simd_float4x4.basis(right: camera.right, up: camera.up, forward: camera.forward)
         let viewMatrix = simd_float4x4.rigidInverse(rotationAndBasis: basis, position: ship.position)
         // DStar's world is left-handed with +Z forward; Metal's perspective
         // matrix looks down -Z. The original OpenGL renderer performed this

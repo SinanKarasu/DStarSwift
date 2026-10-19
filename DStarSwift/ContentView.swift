@@ -77,6 +77,9 @@ struct ContentView: View {
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
+        .overlay(alignment: .bottomTrailing) {
+            DStarNavigationGlobe(hud: hud).padding()
+        }
         .animation(.easeInOut(duration: 0.15), value: hud.showHelp)
     }
 
@@ -111,6 +114,7 @@ struct ContentView: View {
     @MainActor
     private func toggleImmersiveSpace() async {
         if isImmersiveActive {
+            hud.onCommand?(.setGlobeSteering(.zero))
             await dismissImmersiveSpace()
             isImmersiveActive = false
             immersiveStatus = "Windowed"

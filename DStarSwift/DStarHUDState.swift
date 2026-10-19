@@ -45,6 +45,8 @@ final class DStarHUDState: ObservableObject {
     @Published private(set) var radarTargetName: String?
     @Published private(set) var radarTargetRange: Float?
     @Published private(set) var lockedBy: [String] = []
+    @Published private(set) var look = DStarLook()
+    @Published private(set) var position: SIMD3<Float> = .zero
     @Published private(set) var orientation: DStarHUDOrientation = .identity
     @Published private(set) var visibleShips: [DStarHUDShip] = []
     @Published private(set) var simulationTime: Float = 0
@@ -70,6 +72,8 @@ final class DStarHUDState: ObservableObject {
     var onSpawnRobot: (() -> Void)?
 
     func update(from game: DStarGameState) {
+        if look != game.look { look = game.look }
+        if position != game.me.position { position = game.me.position }
         if showHelp != game.showHelp { showHelp = game.showHelp }
         if freezeFrame != game.freezeFrame { freezeFrame = game.freezeFrame }
         if autoPilot != game.autoPilot { autoPilot = game.autoPilot }

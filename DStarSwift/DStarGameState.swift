@@ -111,6 +111,7 @@ struct DStarInputState {
     var arrowDown = false
     var arrowLeft = false
     var arrowRight = false
+    var globeSteering: SIMD2<Float> = .zero
     var functionKeys: Set<Int> = []
 }
 
@@ -127,6 +128,8 @@ enum DStarInputAction {
     case keyCharacter(String)
     case tab
     case escape
+    case setLook(DStarLook)
+    case setGlobeSteering(SIMD2<Float>)
     case visitHabitat
 }
 
@@ -154,6 +157,7 @@ final class DStarGameState {
     // first-run behavior; H/F1/? dismisses it once the pilot is oriented.
     var showHelp = true
     var freezeFrame = false
+    var look = DStarLook()
     var mouseControl = false
     var missilesRemaining = DStarGameParameters.missilesPerLife
     var armedMissiles = 0
@@ -328,7 +332,18 @@ final class DStarGameState {
             cycleRadarTarget()
         case .escape:
             freezeFrame.toggle()
+        case let .setLook(value):
+            look = DStarLook(yaw: value.yaw, pitch: value.pitch)
+        case let .setGlobeSteering(value):
+            input.globeSteering = DStarLook.steering(value)
+            if input.globeSteering != .zero {
+                autoPilot = false
+                autoFire = false
+                mouseControl = false
+                rebuildMeController()
+            }
         case .visitHabitat:
+            look = DStarLook()
             me.position = SIMD3<Float>(350, 600, 550)
             me.forward = simd_normalize(SIMD3<Float>(0, -600, 750))
             me.right = SIMD3<Float>(1, 0, 0)
