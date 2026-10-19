@@ -33,11 +33,7 @@ struct DStarLegacyHUD: View {
                     .padding(.leading, 32)
                     .padding(.bottom, 62)
 
-                DStarHSIView(orientation: hud.orientation)
-                    .frame(width: 170, height: 145)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .padding(.trailing, 48)
-                    .padding(.bottom, 35)
+
             }
         }
         .accessibilityHidden(true)
@@ -134,7 +130,7 @@ private struct DStarReticle: View {
     }
 }
 
-private struct DStarHSIView: View {
+struct DStarHSIView: View {
     let orientation: DStarHUDOrientation
 
     var body: some View {

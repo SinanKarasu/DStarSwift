@@ -45,12 +45,20 @@ final class DStarHUDState: ObservableObject {
     @Published private(set) var radarTargetName: String?
     @Published private(set) var radarTargetRange: Float?
     @Published private(set) var lockedBy: [String] = []
+    @Published private(set) var look = DStarLook()
+    @Published private(set) var position: SIMD3<Float> = .zero
     @Published private(set) var orientation: DStarHUDOrientation = .identity
     @Published private(set) var visibleShips: [DStarHUDShip] = []
     @Published private(set) var simulationTime: Float = 0
     /// Effective brightness of lit geometry in the immersive scene. Stars
     /// stay unlit, so zero produces a black world with stars still visible.
     @Published var ambientLight: Double = 0.25
+
+#if os(visionOS)
+    @Published var isImmersiveActive = false
+    @Published var isImmersiveTransitioning = false
+    @Published var immersiveStatus = "Windowed"
+#endif
 
     /// Set by the renderer; the HUD uses it to forward menu/UI commands
     /// back into the game state.
@@ -70,6 +78,8 @@ final class DStarHUDState: ObservableObject {
     var onSpawnRobot: (() -> Void)?
 
     func update(from game: DStarGameState) {
+        if look != game.look { look = game.look }
+        if position != game.me.position { position = game.me.position }
         if showHelp != game.showHelp { showHelp = game.showHelp }
         if freezeFrame != game.freezeFrame { freezeFrame = game.freezeFrame }
         if autoPilot != game.autoPilot { autoPilot = game.autoPilot }

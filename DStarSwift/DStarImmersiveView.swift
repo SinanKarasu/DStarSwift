@@ -9,141 +9,135 @@ enum DStarImmersiveSpace {
 
 struct DStarImmersiveView: View {
     @EnvironmentObject private var hud: DStarHUDState
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     @State private var legacyWorld = DStarLegacyWorld()
 
     private let worldScale: Float = 0.001
     private let worldAnchorName = "dstar-world"
-    private let hsiAnchorName = "dstar-head-hsi-anchor"
-    private let hsiGlobeName = "dstar-head-hsi-globe"
     private let worldBodyPrefix = "dstar-world-body-"
     private let worldMaterialPrefix = "dstar-world-material-"
     private let shipPrefix = "dstar-ship-"
 
     var body: some View {
-        RealityView { content in
+        RealityView { content, attachments in
             let anchor = AnchorEntity(world: .zero)
             anchor.name = worldAnchorName
             anchor.addChild(makeLegacyWorldEntity(scale: worldScale, brightness: hud.ambientLight))
             anchor.addChild(makeStarfieldEntity(scale: worldScale))
+            let habitat = makeHabitatEntity()
+            content.add(habitat)
+            applyCamera(to: habitat, cameraRelative: true)
             content.add(anchor)
+            applyCamera(to: anchor)
+            // Keep the exit independent of the game world and room origin.
+            let exitAnchor = AnchorEntity(.head, trackingMode: .continuous)
+            if let exit = attachments.entity(for: "exit-immersive") {
+                exit.position = SIMD3<Float>(0, -0.22, -0.8)
+                exitAnchor.addChild(exit)
+            }
+            content.add(exitAnchor)
+            if let panel = attachments.entity(for: "navigation") {
+                panel.position = SIMD3<Float>(0.35, 1.05, -0.8)
+                content.add(panel)
+            }
 
-            // Keep the flight instrument in a stable lower-right position in
-            // the wearer's view. The globe itself still rotates with the ship.
-            let hsiAnchor = AnchorEntity(.head, trackingMode: .continuous)
-            hsiAnchor.name = hsiAnchorName
-            hsiAnchor.addChild(makeHeadTrackedHSI())
-            content.add(hsiAnchor)
-        } update: { content in
+        } update: { content, _ in
             if let anchor = content.entities.first(where: { $0.name == worldAnchorName }) {
                 legacyWorld.advance(to: hud.simulationTime)
                 updateLegacyWorld(in: anchor, brightness: hud.ambientLight)
+                if let habitat = content.entities.first(where: { $0.name == "world-v2" }) {
+                    applyHabitatSnapshot(to: habitat)
+                    applyCamera(to: habitat, cameraRelative: true)
+                }
                 synchronizeShips(in: anchor, ships: hud.visibleShips)
+                applyCamera(to: anchor)
             }
-            updateHeadTrackedHSI(in: content, orientation: hud.orientation)
+        } attachments: {
+            Attachment(id: "exit-immersive") {
+                Button {
+                    Task { await exitImmersiveSpace() }
+                } label: {
+                    Label("Exit Immersive", systemImage: "rectangle.portrait.and.arrow.right")
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(hud.isImmersiveTransitioning)
+                .glassBackgroundEffect()
+            }
+            Attachment(id: "navigation") {
+                DStarNavigationGlobe(hud: hud)
+            }
+        }
+        .onAppear {
+            hud.isImmersiveActive = true
+            hud.immersiveStatus = "Immersive Active"
+        }
+        .onDisappear {
+            hud.onCommand?(.setGlobeSteering(.zero))
+            hud.isImmersiveActive = false
+            hud.immersiveStatus = "Windowed"
         }
     }
 
-    private func makeHeadTrackedHSI() -> Entity {
+    @MainActor
+    private func exitImmersiveSpace() async {
+        guard !hud.isImmersiveTransitioning else { return }
+        hud.isImmersiveTransitioning = true
+        defer { hud.isImmersiveTransitioning = false }
+        hud.onCommand?(.setGlobeSteering(.zero))
+        await dismissImmersiveSpace()
+        hud.isImmersiveActive = false
+        hud.immersiveStatus = "Windowed"
+    }
+
+    /// Reflect DStar +Z into RealityKit -Z after applying the inverse cockpit pose.
+    /// Head tracking remains entirely under RealityKit's control.
+    private func applyCamera(to root: Entity, cameraRelative: Bool = false) {
+        let camera = hud.look.orientation(relativeTo: hud.orientation)
+        let basis = simd_float3x3(columns: (camera.right, camera.up, camera.forward))
+        let inverse = simd_quatf(basis).inverse
+        let reflected = simd_quatf(ix: -inverse.imag.x, iy: -inverse.imag.y,
+                                   iz: inverse.imag.z, r: inverse.real)
+        root.scale = SIMD3<Float>(1, 1, -1)
+        root.orientation = reflected
+        root.position = cameraRelative ? .zero : reflected.act(SIMD3<Float>(-hud.position.x, -hud.position.y,
+                                                   hud.position.z) * worldScale)
+    }
+
+    private func makeHabitatEntity() -> Entity {
         let root = Entity()
-        root.name = hsiGlobeName
-        // RealityKit's view direction is -Z. This places the 11 cm globe at a
-        // comfortable instrument-panel distance, below and right of center.
-        root.position = SIMD3<Float>(0.30, -0.22, -0.55)
-
-        let latitudeSegments = 8
-        let longitudeSegments = 16
-        let radius: Float = 0.055
-        var positions: [SIMD3<Float>] = []
-        positions.reserveCapacity((latitudeSegments + 1) * longitudeSegments)
-
-        for latitudeIndex in 0...latitudeSegments {
-            let latitude = -Float.pi / 2
-                + Float(latitudeIndex) * Float.pi / Float(latitudeSegments)
-            let radial = cos(latitude)
-            let y = sin(latitude)
-            for longitudeIndex in 0..<longitudeSegments {
-                let longitude = Float(longitudeIndex) * 2 * Float.pi
-                    / Float(longitudeSegments)
-                positions.append(SIMD3<Float>(
-                    radius * radial * sin(longitude),
-                    radius * y,
-                    radius * radial * cos(longitude)
-                ))
-            }
+        root.name = "world-v2"
+        guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime),
+            relativeTo: try WorldPosition(offset: SIMD3<Double>(hud.position))) else { return root }
+        for item in items {
+            var descriptor = MeshDescriptor(name: item.geometry.id)
+            descriptor.positions = MeshBuffer(item.geometry.positions.map { $0 * worldScale })
+            descriptor.primitives = .triangles(item.geometry.indices)
+            guard let mesh = try? MeshResource.generate(from: [descriptor]) else { continue }
+            let c = item.geometry.color
+            let material = UnlitMaterial(color: UIColor(red: CGFloat(c.x), green: CGFloat(c.y),
+                                                       blue: CGFloat(c.z), alpha: CGFloat(c.w)))
+            let part = ModelEntity(mesh: mesh, materials: [material])
+            part.name = item.id
+            root.addChild(part)
         }
-
-        var faceCounts: [UInt8] = []
-        var indices: [UInt32] = []
-        var materialIndices: [UInt32] = []
-        faceCounts.reserveCapacity(latitudeSegments * longitudeSegments)
-        indices.reserveCapacity(latitudeSegments * longitudeSegments * 4)
-        materialIndices.reserveCapacity(latitudeSegments * longitudeSegments)
-
-        for latitudeIndex in 0..<latitudeSegments {
-            for longitudeIndex in 0..<longitudeSegments {
-                let nextLongitude = (longitudeIndex + 1) % longitudeSegments
-                let lower = latitudeIndex * longitudeSegments
-                let upper = (latitudeIndex + 1) * longitudeSegments
-                faceCounts.append(4)
-                indices.append(contentsOf: [
-                    UInt32(lower + longitudeIndex),
-                    UInt32(lower + nextLongitude),
-                    UInt32(upper + nextLongitude),
-                    UInt32(upper + longitudeIndex)
-                ])
-
-                if longitudeIndex == 0 || latitudeIndex < latitudeSegments / 2 {
-                    materialIndices.append(1) // red reference hemisphere/axis
-                } else if longitudeIndex == longitudeSegments / 2 {
-                    materialIndices.append(2) // green reciprocal axis
-                } else {
-                    materialIndices.append(0)
-                }
-            }
-        }
-
-        var descriptor = MeshDescriptor(name: "DStar head-tracked HSI")
-        descriptor.positions = MeshBuffer(positions)
-        descriptor.primitives = .polygons(faceCounts, indices)
-        descriptor.materials = .perFace(materialIndices)
-
-        guard let mesh = try? MeshResource.generate(from: [descriptor]) else {
-            return root
-        }
-
-        func wireMaterial(_ color: UIColor) -> UnlitMaterial {
-            var material = UnlitMaterial(color: color)
-            material.triangleFillMode = .lines
-            material.faceCulling = .none
-            return material
-        }
-
-        let globe = ModelEntity(
-            mesh: mesh,
-            materials: [
-                wireMaterial(UIColor(white: 0.88, alpha: 0.92)),
-                wireMaterial(UIColor(red: 1, green: 0.08, blue: 0.08, alpha: 0.95)),
-                wireMaterial(UIColor(red: 0.1, green: 1, blue: 0.2, alpha: 0.95))
-            ]
-        )
-        root.addChild(globe)
+        applyHabitatSnapshot(to: root)
         return root
     }
 
-    private func updateHeadTrackedHSI(
-        in content: RealityViewContent,
-        orientation: DStarHUDOrientation
-    ) {
-        guard let anchor = content.entities.first(where: { $0.name == hsiAnchorName }),
-              let globe = anchor.children.first(where: { $0.name == hsiGlobeName }) else {
-            return
+    private func applyHabitatSnapshot(to root: Entity) {
+        guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime),
+            relativeTo: try WorldPosition(offset: SIMD3<Double>(hud.position))) else { return }
+        for item in items {
+            guard let part = root.children.first(where: { $0.name == item.id }) else { continue }
+            part.position = SIMD3<Float>(item.pose.position) * worldScale
+            part.orientation = simd_quatf(ix: Float(item.pose.orientation.imag.x),
+                                         iy: Float(item.pose.orientation.imag.y),
+                                         iz: Float(item.pose.orientation.imag.z),
+                                         r: Float(item.pose.orientation.real))
         }
-
-        var basis = matrix_identity_float4x4
-        basis.columns.0 = SIMD4<Float>(orientation.right, 0)
-        basis.columns.1 = SIMD4<Float>(orientation.up, 0)
-        basis.columns.2 = SIMD4<Float>(orientation.forward, 0)
-        globe.orientation = simd_quatf(basis)
     }
 
     private func makeLegacyWorldEntity(scale: Float, brightness: Double) -> Entity {

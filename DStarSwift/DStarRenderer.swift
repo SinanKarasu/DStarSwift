@@ -142,7 +142,9 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
             farZ: 10_000.0
         )
         let ship = gameState.me
-        let basis = simd_float4x4.basis(right: ship.right, up: ship.up, forward: ship.forward)
+        let camera = gameState.look.orientation(relativeTo: DStarHUDOrientation(
+            forward: ship.forward, up: ship.up, right: ship.right))
+        let basis = simd_float4x4.basis(right: camera.right, up: camera.up, forward: camera.forward)
         let viewMatrix = simd_float4x4.rigidInverse(rotationAndBasis: basis, position: ship.position)
         // DStar's world is left-handed with +Z forward; Metal's perspective
         // matrix looks down -Z. The original OpenGL renderer performed this
@@ -172,6 +174,23 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
                 lineVertices.append(contentsOf: bodyVertices.1)
             }
 
+            triangleVertices = triangleVertices.map {
+                StarVertex(position: $0.position - ship.position, color: $0.color)
+            }
+
+            // Both backends consume the same procedural geometry and frame snapshot.
+            if let items = try? DStarWorld.arrival.snapshot(at: Double(gameState.elapsedTime),
+                relativeTo: try WorldPosition(offset: SIMD3<Double>(ship.position))) {
+                for item in items {
+                    for index in item.geometry.indices {
+                        triangleVertices.append(StarVertex(
+                            position: item.pose.renderPoint(item.geometry.positions[Int(index)], relativeTo: .zero),
+                            color: item.geometry.color))
+                    }
+                }
+            }
+
+            let habitatVertexCount = triangleVertices.count
             // Append every other ship's mesh into the same triangle buffer.
             // Player ship (`me`) is not drawn — the camera IS its cockpit.
             for other in gameState.others.values {
@@ -180,6 +199,19 @@ final class DStarRenderer: NSObject, MTKViewDelegate {
                 } else {
                     appendFighterTriangles(for: other, into: &triangleVertices)
                 }
+            }
+
+            for index in habitatVertexCount..<triangleVertices.count {
+                triangleVertices[index].position -= ship.position
+            }
+            // Stars retain the legacy world-space camera; mesh geometry uses a nearby origin.
+            let relativeView = simd_float4x4.rigidInverse(rotationAndBasis: basis, position: .zero)
+            uniforms = Uniforms(viewProjection: projection * dstarToMetal * relativeView)
+            lineVertices = lineVertices.map {
+                StarVertex(position: $0.position - ship.position, color: $0.color)
+            }
+            missileLineVertices = missileLineVertices.map {
+                StarVertex(position: $0.position - ship.position, color: $0.color)
             }
 
             if !triangleVertices.isEmpty {

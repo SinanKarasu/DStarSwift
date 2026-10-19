@@ -6,6 +6,12 @@ RealityKit immersive scene on visionOS.
 Features include the legacy world and starfield, ship controls, radar and HUD,
 missiles, robot opponents, and Bonjour multiplayer discovery.
 
+## World engine v2
+
+The `codex/world-engine-v2` branch adds shared procedural geometry and hierarchical
+reference frames for Metal and RealityKit, starting with a rotating O’Neill cylinder.
+See [World Engine v2](WORLD_ENGINE_V2.md) for architecture, placement, and current limits.
+
 ## Origins and credits
 
 **DStar was originally written by Ed Falk.** The original game used Sun's XGL
@@ -30,9 +36,16 @@ Open `DStarSwift.xcodeproj` in Xcode with the macOS and visionOS SDKs installed.
 - Use the on-screen help for controls. Bonjour multiplayer requires local
   network access.
 
-The project currently targets macOS 26.2 and visionOS 26.2 or later.
+The project currently targets macOS 26.2 and visionOS 27.0 or later.
 The scene manifest in `DStarSwift/Info.plist` enables multiple scenes, which
 visionOS requires to open the immersive space alongside the main window.
+
+## Documentation
+
+- [User Manual](USER_MANUAL.md): first flight, controls, robots, multiplayer, and immersive mode.
+- [Coordinate Architecture](COORDINATE_ARCHITECTURE.md): universal precision, local frames, and spatial UI.
+- [Roadmap](ROADMAP.md): proposed priorities and historical features to revisit.
+- [Porting Plan](PORTING_PLAN.md): implementation notes and development history.
 
 ## Tests
 

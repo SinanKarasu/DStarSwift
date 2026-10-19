@@ -100,6 +100,7 @@ struct DStarSwiftApp: App {
 #if os(visionOS)
         ImmersiveSpace(id: DStarImmersiveSpace.id) {
             DStarImmersiveView()
+                .environmentObject(hud)
         }
         .immersionStyle(selection: $immersionStyle, in: .mixed, .full)
 #endif
