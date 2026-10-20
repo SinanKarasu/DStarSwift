@@ -66,8 +66,8 @@ struct DStarWorld {
         var orientation: simd_quatd
     }
 
-    private func definitions(at time: Double) throws -> [String: WorldFrame] {
-        guard time.isFinite else { throw WorldDefinitionError.invalidTime }
+    private func definitions(at time: Double, frameTimes: [String: Double] = [:]) throws -> [String: WorldFrame] {
+        guard time.isFinite, frameTimes.values.allSatisfy(\.isFinite) else { throw WorldDefinitionError.invalidTime }
         var result: [String: WorldFrame] = [:]
         for frame in frames {
             guard result[frame.id] == nil else { throw WorldDefinitionError.duplicateFrame(frame.id) }
@@ -77,9 +77,10 @@ struct DStarWorld {
                 throw WorldDefinitionError.invalidFrame(frame.id)
             }
             if frame.parent != nil && frame.anchor != .zero { throw WorldDefinitionError.anchoredChild(frame.id) }
+            let frameTime = frameTimes[frame.id] ?? time
             var evaluated = frame
             evaluated.pose.orientation = simd_normalize(frame.pose.orientation * simd_quatd(
-                angle: frame.spin * time.truncatingRemainder(dividingBy: frame.spin == 0 ? 1 : 2 * .pi / abs(frame.spin)),
+                angle: frame.spin * frameTime.truncatingRemainder(dividingBy: frame.spin == 0 ? 1 : 2 * .pi / abs(frame.spin)),
                 axis: SIMD3<Double>(0, 1, 0)))
             result[frame.id] = evaluated
         }
@@ -97,8 +98,8 @@ struct DStarWorld {
     }
 
     /// Output poses are relative to the supplied observer, never absolute astronomical Doubles.
-    func snapshot(at time: Double, relativeTo origin: WorldPosition = .zero) throws -> [WorldDrawItem] {
-        let definitions = try definitions(at: time)
+    func snapshot(at time: Double, relativeTo origin: WorldPosition = .zero, frameTimes: [String: Double] = [:]) throws -> [WorldDrawItem] {
+        let definitions = try definitions(at: time, frameTimes: frameTimes)
         var resolved: [String: ResolvedFrame] = [:]
         func resolve(_ id: String) throws -> ResolvedFrame {
             if let value = resolved[id] { return value }
@@ -169,7 +170,9 @@ struct DStarWorld {
         frames: [
             WorldFrame(id: "habitat", pose: WorldPose(position: SIMD3<Double>(350, 0, 1300))),
             WorldFrame(id: "habitat.rotating", parent: "habitat", spin: 0.08),
-            WorldFrame(id: "habitat.hub", parent: "habitat")
+            WorldFrame(id: "habitat.hub", parent: "habitat"),
+            WorldFrame(id: "station", pose: WorldPose(position: SIMD3<Double>(DStarStation.center),
+                orientation: simd_quatd(angle: .pi / 2, axis: SIMD3(1,0,0))), spin: Double(DStarStation.spin))
         ],
         instances: [
             WorldInstance(id: "cylinder.land", frame: "habitat.rotating",
@@ -180,7 +183,9 @@ struct DStarWorld {
                           geometry: HabitatGeometry.rims()),
             WorldInstance(id: "cylinder.hub", frame: "habitat.hub",
                           geometry: HabitatGeometry.hub())
-        ])
+        ] + ((try? DStarStationAsset.result.get()) ?? []).map {
+            WorldInstance(id: $0.id, frame: "station", geometry: $0)
+        })
 }
 
 /// First habitat: open axial entrances, three land bands alternating with blue window bands.

@@ -70,7 +70,8 @@ struct DStarImmersiveView: View {
         let root = Entity()
         root.name = "world-v2"
         guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime),
-            relativeTo: try WorldPosition(offset: SIMD3<Double>(hud.position))) else { return root }
+            relativeTo: try WorldPosition(offset: SIMD3<Double>(hud.position)),
+            frameTimes: ["station": Double(hud.stationTime)]) else { return root }
         for item in items {
             var descriptor = MeshDescriptor(name: item.geometry.id)
             descriptor.positions = MeshBuffer(item.geometry.positions.map { $0 * worldScale })
@@ -89,7 +90,8 @@ struct DStarImmersiveView: View {
 
     private func applyHabitatSnapshot(to root: Entity) {
         guard let items = try? DStarWorld.arrival.snapshot(at: Double(hud.simulationTime),
-            relativeTo: try WorldPosition(offset: SIMD3<Double>(hud.position))) else { return }
+            relativeTo: try WorldPosition(offset: SIMD3<Double>(hud.position)),
+            frameTimes: ["station": Double(hud.stationTime)]) else { return }
         for item in items {
             guard let part = root.children.first(where: { $0.name == item.id }) else { continue }
             part.position = SIMD3<Float>(item.pose.position) * worldScale

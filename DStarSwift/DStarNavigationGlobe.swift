@@ -21,6 +21,26 @@ struct DStarNavigationGlobe: View {
                 .accessibilityHint("Cyan dot shows viewing direction; white center marks ship heading.")
             Text(steering ? "Drag to turn · release to stop" : "Drag to look · cyan marks view")
                 .font(.caption2)
+            Group {
+                Button("Visit Docking Core") { release(); hud.onCommand?(.visitStation) }
+                if case .failure = DStarStationAsset.result {
+                    Text("Station model failed to load").foregroundStyle(.red)
+                }
+                Text(hud.stationDocked ? "Docked" : String(format: "Berth %.0f m · roll %.0f°", hud.stationRange, hud.stationRollDegrees))
+                    .font(.caption).monospacedDigit()
+                Text(String(format: "Axis %.1f m · heading %.0f°", hud.stationLateral, hud.stationHeadingDegrees))
+                    .font(.caption2).monospacedDigit()
+                HStack {
+                    Button("Approach") { release(); hud.onCommand?(.stationApproach) }
+                    Button("Undock") { hud.onCommand?(.stationUndock) }.disabled(!hud.stationDocked)
+                }
+                HStack {
+                    Button("Roll ↶") { hud.onCommand?(.stationRoll(-5 * .pi / 180)) }
+                    Button("Roll ↷") { hud.onCommand?(.stationRoll(5 * .pi / 180)) }
+                }
+                Button(hud.stationMatchRoll ? "Release Roll Match" : "Match Station Roll") { hud.onCommand?(.stationMatchRoll) }
+                Button(hud.stationSpinning ? "Stop Station Spin" : "Start Station Spin") { hud.onCommand?(.stationToggleSpin) }
+            }.font(.caption)
             Button("Center View") { release(); hud.onCommand?(.setLook(DStarLook())) }
             HStack {
                 Button(hud.freezeFrame ? "Resume" : "Pause") { release(); hud.commandToggleFreeze() }

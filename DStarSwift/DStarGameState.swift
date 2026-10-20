@@ -131,6 +131,12 @@ enum DStarInputAction {
     case setLook(DStarLook)
     case setGlobeSteering(SIMD2<Float>)
     case visitHabitat
+    case visitStation
+    case stationApproach
+    case stationRoll(Float)
+    case stationMatchRoll
+    case stationToggleSpin
+    case stationUndock
 }
 
 /// Owns the local player ship (`me`) plus a roster of other ships.
@@ -163,6 +169,10 @@ final class DStarGameState {
     var armedMissiles = 0
     var dtime: Float = 1 / 60
     private(set) var elapsedTime: Float = 0
+    private(set) var stationDocked = false
+    private(set) var stationMatchRoll = false
+    private(set) var stationTime: Float = 0
+    private(set) var stationSpinning = true
     var input = DStarInputState()
 
     /// Every ship other than `me`, keyed by id.
@@ -342,7 +352,37 @@ final class DStarGameState {
                 mouseControl = false
                 rebuildMeController()
             }
+        case .visitStation:
+            apply(.visitHabitat)
+            me.position = SIMD3<Float>(0,0,800)
+            me.forward = SIMD3(0,0,1)
+            me.up = DStarStation.up(at: stationTime)
+            me.right = simd_cross(me.up, me.forward)
+            stationMatchRoll = false
+            freezeFrame = false
+        case .stationApproach:
+            guard !stationDocked else { return }
+            autoPilot = false; autoFire = false; mouseControl = false
+            input = DStarInputState(); me.delta = .zero
+            me.speed = 2
+            rebuildMeController()
+        case let .stationRoll(angle):
+            guard !stationDocked else { return }
+            stationMatchRoll = false
+            let roll = simd_quatf(angle: angle, axis: me.forward)
+            me.up = roll.act(me.up); me.right = roll.act(me.right)
+        case .stationMatchRoll:
+            stationMatchRoll.toggle()
+        case .stationToggleSpin:
+            stationSpinning.toggle()
+        case .stationUndock:
+            guard stationDocked else { return }
+            stationDocked = false
+            // Move outside the entrance to prevent immediate recapture.
+            me.position = SIMD3(0,0,920); me.speed = 0
         case .visitHabitat:
+            stationDocked = false
+            stationMatchRoll = false
             look = DStarLook()
             me.position = SIMD3<Float>(350, 600, 550)
             me.forward = simd_normalize(SIMD3<Float>(0, -600, 750))
@@ -382,6 +422,7 @@ final class DStarGameState {
         dtime = max(deltaTime, 0)
         if freezeFrame { return }
         elapsedTime += dtime
+        if stationSpinning { stationTime += dtime }
 
         // Drive the local player.
         let meWorld = ShipWorld(
@@ -390,7 +431,28 @@ final class DStarGameState {
             input: input,
             mouseControl: mouseControl
         )
-        controllers[me.id]?.step(ship: &me, world: meWorld)
+        if !stationDocked { controllers[me.id]?.step(ship: &me, world: meWorld) }
+        if stationDocked || stationMatchRoll {
+            // Project the station's up vector into the ship's roll plane.
+            let target = DStarStation.up(at: stationTime)
+            let projected = target - simd_dot(target, me.forward) * me.forward
+            if simd_length_squared(projected) > 0.0001 {
+                me.up = simd_normalize(projected)
+                me.right = simd_normalize(simd_cross(me.up, me.forward))
+            }
+        }
+        if !stationDocked && DStarStation.canCapture(position: me.position, forward: me.forward,
+                up: me.up, speed: me.speed, at: stationTime) {
+            stationDocked = true
+            autoPilot = false; autoFire = false; mouseControl = false
+            input = DStarInputState(); me.flags &= ~DStarObjectFlags.laser
+            rebuildMeController()
+        }
+        if stationDocked {
+            me.position = DStarStation.berth; me.speed = 0; me.delta = .zero
+            me.forward = SIMD3(0,0,1); me.up = DStarStation.up(at: stationTime)
+            me.right = simd_cross(me.up, me.forward)
+        }
 
         // Drive every other ship. Each controller sees the rest of the world
         // (including the freshly-updated `me`) but not its own ship.

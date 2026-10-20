@@ -52,6 +52,14 @@ final class DStarHUDState: ObservableObject {
     @Published private(set) var simulationTime: Float = 0
     /// Effective brightness of lit geometry in the immersive scene. Stars
     /// stay unlit, so zero produces a black world with stars still visible.
+    @Published private(set) var stationTime: Float = 0
+    @Published private(set) var stationDocked = false
+    @Published private(set) var stationMatchRoll = false
+    @Published private(set) var stationSpinning = true
+    @Published private(set) var stationRange: Float = 0
+    @Published private(set) var stationRollDegrees: Float = 0
+    @Published private(set) var stationLateral: Float = 0
+    @Published private(set) var stationHeadingDegrees: Float = 0
     @Published var ambientLight: Double = 0.25
 
     /// Set by the renderer; the HUD uses it to forward menu/UI commands
@@ -72,6 +80,19 @@ final class DStarHUDState: ObservableObject {
     var onSpawnRobot: (() -> Void)?
 
     func update(from game: DStarGameState) {
+        if stationTime != game.stationTime { stationTime = game.stationTime }
+        if stationDocked != game.stationDocked { stationDocked = game.stationDocked }
+        if stationMatchRoll != game.stationMatchRoll { stationMatchRoll = game.stationMatchRoll }
+        if stationSpinning != game.stationSpinning { stationSpinning = game.stationSpinning }
+        let range = simd_distance(game.me.position, DStarStation.berth).rounded()
+        if stationRange != range { stationRange = range }
+        let roll = (DStarStation.rollError(up: game.me.up, at: game.stationTime) * 180 / .pi).rounded()
+        if stationRollDegrees != roll { stationRollDegrees = roll }
+        let offset = game.me.position - DStarStation.center
+        let lateral = (sqrt(offset.x * offset.x + offset.y * offset.y) * 10).rounded() / 10
+        if stationLateral != lateral { stationLateral = lateral }
+        let heading = (acos(max(-1, min(1, game.me.forward.z))) * 180 / .pi).rounded()
+        if stationHeadingDegrees != heading { stationHeadingDegrees = heading }
         if look != game.look { look = game.look }
         if position != game.me.position { position = game.me.position }
         if showHelp != game.showHelp { showHelp = game.showHelp }

@@ -1,0 +1,23 @@
+{
+  "originHash" : "90ed636043dc375f78b420ac113a84851ce3b3e09c8a44cf68234bb8b37be427",
+  "pins" : [
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser.git",
+      "state" : {
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
+      }
+    },
+    {
+      "identity" : "swiftgltf",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/SwiftGLTF.git",
+      "state" : {
+        "revision" : "529cf3a40fbe7fcf9990f42f0a8a39487d3aebcc"
+      }
+    }
+  ],
+  "version" : 3
+}

@@ -61,3 +61,10 @@ See [PORTING_PLAN.md](PORTING_PLAN.md) for implementation notes and remaining wo
 
 Licensed under the [MIT License](LICENSE). See the origins and credits above
 for attribution to Ed Falk, creator of the original DStar and its Linux OpenGL port.
+
+### Docking-core prototype
+
+An original glTF station model now loads through [SwiftGLTF](https://github.com/schwa/SwiftGLTF)
+into both rendering backends. Try **Visit Docking Core** in the globe panel.
+See [the station guide](STATION_PROTOTYPE.md) and bundled
+[third-party notices](DStarSwift/ThirdPartyNotices.txt).

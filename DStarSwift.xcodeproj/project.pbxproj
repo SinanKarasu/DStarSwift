@@ -6,6 +6,17 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+        2B0000000000000000000001 = {isa = PBXBuildFile; productRef = 2B0000000000000000000003; };
+        2B0000000000000000000002 = {isa = PBXBuildFile; productRef = 2B0000000000000000000004; };
+/* End PBXBuildFile section */
+/* Begin XCRemoteSwiftPackageReference section */
+        2B0000000000000000000005 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/schwa/SwiftGLTF.git"; requirement = {kind = revision; revision = 529cf3a40fbe7fcf9990f42f0a8a39487d3aebcc; }; };
+/* End XCRemoteSwiftPackageReference section */
+/* Begin XCSwiftPackageProductDependency section */
+        2B0000000000000000000003 = {isa = XCSwiftPackageProductDependency; package = 2B0000000000000000000005; productName = SwiftGLTF; };
+        2B0000000000000000000004 = {isa = XCSwiftPackageProductDependency; package = 2B0000000000000000000005; productName = SwiftGLTF; };
+/* End XCSwiftPackageProductDependency section */
 /* Begin PBXContainerItemProxy section */
 		1A0000000000000000000007 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -68,6 +79,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+                2B0000000000000000000002,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +87,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+                2B0000000000000000000001,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,7 +153,8 @@
 				F785B2AE2F3E4EFA00C94267 /* DStarSwift */,
 			);
 			name = DStarSwiftVision;
-			productName = DStarSwiftVision;
+			packageProductDependencies = (2B0000000000000000000004,);
+            productName = DStarSwiftVision;
 			productReference = 453D8C9A19378ACABD2B7DC6 /* DStarSwiftVision.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -160,7 +174,8 @@
 				F785B2AE2F3E4EFA00C94267 /* DStarSwift */,
 			);
 			name = DStarSwift;
-			productName = DStarSwift;
+			packageProductDependencies = (2B0000000000000000000003,);
+            productName = DStarSwift;
 			productReference = F785B2AC2F3E4EFA00C94267 /* DStarSwift.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -195,6 +210,7 @@
 			);
 			mainGroup = F785B2A32F3E4EFA00C94267;
 			minimizedProjectReferenceProxies = 1;
+            packageReferences = (2B0000000000000000000005,);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F785B2AD2F3E4EFA00C94267 /* Products */;
 			projectDirPath = "";

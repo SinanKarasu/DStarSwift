@@ -169,3 +169,9 @@ window. Keep the main window available for its controls.
 - [README](README.md): project overview, credits, setup, and license.
 - [Roadmap](ROADMAP.md): proposed work and historical features to revisit.
 - [Porting plan](PORTING_PLAN.md): detailed implementation history and notes.
+
+## Docking-core flight trial
+
+The globe panel now includes a **Visit Docking Core** action on Mac and Vision Pro.
+Use **Match Station Roll**, then **Approach**, to try a slow axial docking.
+See [the station prototype guide](STATION_PROTOTYPE.md) for controls and limitations.
