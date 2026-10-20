@@ -152,7 +152,11 @@ end-to-end validation. Local pause is not a synchronized multiplayer pause.
 ## visionOS and immersive mode
 
 Choose **Enter Immersive** to open the RealityKit scene. The button changes to
-**Exit Immersive** after a successful opening. The status label reports whether
+**Exit Immersive** after a successful opening. Inside the immersive scene, a
+separate **Exit Immersive** button stays below the center of your view and follows
+your head, so you can return to the window even after turning or walking away.
+Exiting also releases globe steering and resets the window's immersive state.
+The status label reports whether
 the app is windowed, active, cancelled, or encountered an error.
 
 The scene includes the legacy world, stars, replicated ship visuals, and a
@@ -162,7 +166,7 @@ panel and weapons controls remain future work.
 
 If opening fails, rebuild the current project and retry. Its Info.plist enables
 multiple scenes, which is required to open the immersive space alongside the
-window. Keep the main window available for its controls.
+window. Use the in-scene **Exit Immersive** button to return to the main window.
 
 ## Further reading
 

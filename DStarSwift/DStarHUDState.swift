@@ -62,6 +62,12 @@ final class DStarHUDState: ObservableObject {
     @Published private(set) var stationHeadingDegrees: Float = 0
     @Published var ambientLight: Double = 0.25
 
+#if os(visionOS)
+    @Published var isImmersiveActive = false
+    @Published var isImmersiveTransitioning = false
+    @Published var immersiveStatus = "Windowed"
+#endif
+
     /// Set by the renderer; the HUD uses it to forward menu/UI commands
     /// back into the game state.
     var onCommand: ((DStarInputAction) -> Void)?

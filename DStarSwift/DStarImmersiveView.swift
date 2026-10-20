@@ -9,6 +9,7 @@ enum DStarImmersiveSpace {
 
 struct DStarImmersiveView: View {
     @EnvironmentObject private var hud: DStarHUDState
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     @State private var legacyWorld = DStarLegacyWorld()
 
     private let worldScale: Float = 0.001
@@ -28,6 +29,13 @@ struct DStarImmersiveView: View {
             applyCamera(to: habitat, cameraRelative: true)
             content.add(anchor)
             applyCamera(to: anchor)
+            // Keep the exit independent of the game world and room origin.
+            let exitAnchor = AnchorEntity(.head, trackingMode: .continuous)
+            if let exit = attachments.entity(for: "exit-immersive") {
+                exit.position = SIMD3<Float>(0, -0.22, -0.8)
+                exitAnchor.addChild(exit)
+            }
+            content.add(exitAnchor)
             if let panel = attachments.entity(for: "navigation") {
                 panel.position = SIMD3<Float>(0.35, 1.05, -0.8)
                 content.add(panel)
@@ -45,11 +53,43 @@ struct DStarImmersiveView: View {
                 applyCamera(to: anchor)
             }
         } attachments: {
+            Attachment(id: "exit-immersive") {
+                Button {
+                    Task { await exitImmersiveSpace() }
+                } label: {
+                    Label("Exit Immersive", systemImage: "rectangle.portrait.and.arrow.right")
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(hud.isImmersiveTransitioning)
+                .glassBackgroundEffect()
+            }
             Attachment(id: "navigation") {
                 DStarNavigationGlobe(hud: hud)
             }
         }
-        .onDisappear { hud.onCommand?(.setGlobeSteering(.zero)) }
+        .onAppear {
+            hud.isImmersiveActive = true
+            hud.immersiveStatus = "Immersive Active"
+        }
+        .onDisappear {
+            hud.onCommand?(.setGlobeSteering(.zero))
+            hud.isImmersiveActive = false
+            hud.immersiveStatus = "Windowed"
+        }
+    }
+
+    @MainActor
+    private func exitImmersiveSpace() async {
+        guard !hud.isImmersiveTransitioning else { return }
+        hud.isImmersiveTransitioning = true
+        defer { hud.isImmersiveTransitioning = false }
+        hud.onCommand?(.setGlobeSteering(.zero))
+        await dismissImmersiveSpace()
+        hud.isImmersiveActive = false
+        hud.immersiveStatus = "Windowed"
     }
 
     /// Reflect DStar +Z into RealityKit -Z after applying the inverse cockpit pose.
