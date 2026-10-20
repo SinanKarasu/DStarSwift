@@ -63,11 +63,94 @@ Existing game/network/legacy-world tests continue to cover the preserved game.
 Physical Vision Pro visual quality, comfort, frame pacing, and the placement
 of the new destination still require headset validation.
 
+## O'Neill cylinder design direction
+
+Build the cylinder as a parametric structure, furnish it with modular assets,
+and use RealityKit to inspect and experience the result. Maintain one versioned
+station specification with stable IDs, radius, length, rotation, section layout,
+terrain seeds and asset references. Blender assets and Swift-generated structure
+must follow this specification rather than becoming independent station models.
+The specification is planned work; the current habitat is defined in Swift.
+
+### Responsibilities and asset workflow
+
+| Component | Responsibility |
+| --- | --- |
+| DStar world engine | Station dimensions, universal placement, reference frames, rotation, docking state and habitat physics. |
+| Blender | Terrain sections, buildings, structural details, UVs and textures. Evaluate Geometry Nodes for generating repeated structures from the station dimensions. |
+| glTF and SwiftGLTF | Transfer authored local geometry into DStar's shared asset layer. The current adapter supports static triangles and untextured unlit colors; textured and physically based materials require further implementation. |
+| RealityKit | Immersive rendering, spatial entities and interaction, with local collision and physics facilities where appropriate. |
+| AR and visionOS | Head tracking, spatial input and placement of a tabletop inspection model or an immersive experience around the wearer. |
+
+Keep astronomical positions in WorldPosition and mesh coordinates local in
+metres. DStar owns rotating reference frames and habitat-scale motion; native
+scene transforms serve presentation and local interaction. Interior effective
+gravity points toward the cylindrical surface, so a single fixed scene-wide
+gravity direction is insufficient. Moving objects also require rotating-frame
+effects such as Coriolis acceleration; visual rotation alone is not a gravity
+simulation.
+
+The first imported asset is the axial docking core, documented in
+[Station Prototype](STATION_PROTOTYPE.md). It provides the initial model-loading,
+approach and capture workflow. Its walls are currently visual-only and it is a
+microgravity facility. Incorporating it into the cylinder's frame hierarchy,
+including the choice of rotating versus stationary docking structure, remains
+a design task.
+
+### First inhabited section
+
+Extend the docking-core foundation with a rotating shell and one inhabited
+section before furnishing the entire circumference:
+
+- A visible interior floor with terrain, a few buildings, trees and recognizable
+  human-scale references.
+- Structural ribs and window sections around the shell.
+- A planned connection from the axial docking area to the inhabited surface.
+- Reusable assets and section boundaries suitable for instancing, visibility
+  culling and later levels of detail.
+
+Validate this section's scale, lighting, navigation and rendering cost before
+repeating it around the cylinder. This is a visual and interaction prototype,
+not a complete habitat engineering or life-support design.
+
+### Three views of the same station
+
+1. **Tabletop inspection:** a reduced model that can be rotated and cut away to
+   inspect the structure and select destinations.
+2. **Exterior flight:** approach and dock with the station at full apparent scale.
+3. **Interior exploration:** a standing viewpoint on the inhabited surface,
+   looking across and upward at the opposite landscape.
+
+All three views must derive from the same station definition. Inspection scale
+and cutaways are presentation choices; they must not change simulation dimensions
+or duplicate station state. Full apparent scale and standing interior exploration
+are planned modes: the current immersive renderer still uses its 0.001 display
+scale.
+
+### Next milestone and acceptance checks
+
+Build **one furnished interior section, visible in both a cutaway inspection
+model and a standing viewpoint inside**.
+
+- Both views use the same dimensions, assets and section IDs.
+- Human-scale landmarks make cylinder curvature and distances understandable.
+- The section's connection toward the axial core is recognizable.
+- Transitions between views preserve a clear sense of location and orientation.
+- Evaluate lighting, material readability, frame pacing and comfort on physical
+  Vision Pro hardware; measure performance before choosing detail budgets.
+- Have a first-time user try inspection, destination selection and entering the
+  interior without coaching; record hesitation, unclear modes and missing feedback.
+
+Confirm current Blender export and RealityKit material/interaction workflows
+before selecting the detailed authoring tools. The first slice does not depend
+on a complete city, landscape ecosystem or universal glTF material support.
+
 ## Next slices
 
-1. Validate scale and approach on M5 Vision Pro; add an explicit arrival viewpoint.
-2. Add hull ribs, axial approach beacons, and a recognizable docking interface.
-3. Add transparent window materials and interior landmarks through shared material definitions.
-4. Unify legacy body snapshots with the new frame model while preserving legacy motion.
-5. Add bounds-based visibility, asset caching in Metal, and detail selection.
-6. Design docked/local flight frames and collision behavior before artificial gravity.
+1. Validate the existing docking-core approach, capture controls and exit on M5 Vision Pro.
+2. Define the shared station specification and the relationship between docking-core and habitat frames.
+3. Build and validate the first inhabited section in cutaway and standing interior views.
+4. Add shared textured/material support and lighting as needed for that section.
+5. Add hull collision, bounds-based visibility, Metal asset caching and detail selection.
+6. Unify legacy body snapshots with the new frame model while preserving legacy motion.
+7. Implement and test rotating-frame motion and interior gravity before enabling physical surface exploration.
